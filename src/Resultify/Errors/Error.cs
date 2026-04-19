@@ -59,8 +59,12 @@ public record Error(string Code, string Message)
     public Error CausedBy(Exception exception) =>
         this with { Causes = [.. Causes, new ExceptionalError(exception)] };
 
+    /// <summary>
+    /// Returns a human-readable representation of the error, including its code (when present)
+    /// and any causal chain. Intended for logs and debugging — not for end-user display.
+    /// </summary>
     public override string ToString() =>
         string.IsNullOrEmpty(Code)
-            ? (Causes.Count > 0 ? $"{Message} (caused by: {string.Join(", ", Causes)})" : Message)
-            : (Causes.Count > 0 ? $"[{Code}] {Message} (caused by: {string.Join(", ", Causes)})" : $"[{Code}] {Message}");
+            ? Causes.Count > 0 ? $"{Message} (caused by: {string.Join(", ", Causes)})" : Message
+            : Causes.Count > 0 ? $"[{Code}] {Message} (caused by: {string.Join(", ", Causes)})" : $"[{Code}] {Message}";
 }

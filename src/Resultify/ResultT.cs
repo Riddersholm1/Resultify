@@ -48,7 +48,7 @@ public readonly struct Result<TValue> : IEquatable<Result<TValue>>
 
     private Result(IReadOnlyList<Error> errors)
     {
-        ValueOrDefault = default(TValue);
+        ValueOrDefault = default(TValue?);
         _errors = errors;
     }
 
@@ -252,7 +252,10 @@ public readonly struct Result<TValue> : IEquatable<Result<TValue>>
 
     // ── Deconstruct ──────────────────────────────────────────
 
-    /// <inheritdoc />
+    /// <summary>Deconstructs the result into its components.</summary>
+    /// <param name="isSuccess">Whether the result is successful.</param>
+    /// <param name="value">The value if successful; otherwise <c>default</c>.</param>
+    /// <param name="errors">The list of errors.</param>
     public void Deconstruct(out bool isSuccess, out TValue? value, out IReadOnlyList<Error> errors)
     {
         isSuccess = IsSuccess;

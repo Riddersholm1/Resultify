@@ -228,7 +228,7 @@ public readonly struct Result : IEquatable<Result>
 
     /// <summary>Add a validation gate. Evaluates the predicate only if currently successful.</summary>
     public Result Ensure(Func<bool> predicate, Error error) =>
-        IsFailure ? this : (predicate() ? this : Failure(error));
+        IsFailure ? this : predicate() ? this : Failure(error);
 
     /// <summary>Add a validation gate with a string error message.</summary>
     public Result Ensure(Func<bool> predicate, string errorMessage) =>
@@ -265,6 +265,9 @@ public readonly struct Result : IEquatable<Result>
 
     // ── Deconstruct ──────────────────────────────────────────
 
+    /// <summary>Deconstruct into <paramref name="isSuccess"/> and the full list of errors.</summary>
+    /// <param name="isSuccess">True when the result is successful.</param>
+    /// <param name="errors">All errors. Empty when successful.</param>
     public void Deconstruct(out bool isSuccess, out IReadOnlyList<Error> errors)
     {
         isSuccess = IsSuccess;
@@ -273,19 +276,22 @@ public readonly struct Result : IEquatable<Result>
 
     // ── Implicit conversions ─────────────────────────────────
 
-    /// <summary>Implicitly convert a single Error to a failed Result.</summary>
+    /// <summary>Implicitly convert a single <see cref="Error"/> to a failed <see cref="Result"/>.</summary>
     public static implicit operator Result(Error error) => Failure(error);
 
-    /// <summary>Implicitly convert a list of Errors to a failed Result.</summary>
+    /// <summary>Implicitly convert a list of <see cref="Error"/>s to a failed <see cref="Result"/>.</summary>
     public static implicit operator Result(List<Error> errors) => Failure(errors);
 
     // ── Equality ─────────────────────────────────────────────
 
+    /// <inheritdoc />
     public bool Equals(Result other) =>
         IsSuccess == other.IsSuccess && Errors.SequenceEqual(other.Errors);
 
+    /// <inheritdoc />
     public override bool Equals(object? obj) => obj is Result other && Equals(other);
 
+    /// <inheritdoc />
     public override int GetHashCode()
     {
         if (IsSuccess)
@@ -303,9 +309,13 @@ public readonly struct Result : IEquatable<Result>
         return hc.ToHashCode();
     }
 
+    /// <summary>Equality operator — returns true when both results have the same success state and errors.</summary>
     public static bool operator ==(Result left, Result right) => left.Equals(right);
+
+    /// <summary>Inequality operator — negation of <c>==</c>.</summary>
     public static bool operator !=(Result left, Result right) => !left.Equals(right);
 
+    /// <summary>Returns a human-readable representation of the result for logs and debugging.</summary>
     public override string ToString() =>
         IsSuccess
             ? "Result: Success"

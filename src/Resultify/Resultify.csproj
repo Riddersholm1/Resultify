@@ -1,36 +1,30 @@
 <Project Sdk="Microsoft.NET.Sdk">
+	<PropertyGroup>
+		<TargetFramework>net10.0</TargetFramework>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+		<LangVersion>latest</LangVersion>
+		<GenerateDocumentationFile>true</GenerateDocumentationFile>
+		<EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
+		<AnalysisLevel>latest-recommended</AnalysisLevel>
+		<IsAotCompatible>true</IsAotCompatible>
+		<IsTrimmable>true</IsTrimmable>
 
-  <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
-    <LangVersion>latest</LangVersion>
-    <GenerateDocumentationFile>true</GenerateDocumentationFile>
-    <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
-    <AnalysisLevel>latest-recommended</AnalysisLevel>
-
-    <!-- NuGet package metadata -->
-    <PackageId>BlazorEventBus</PackageId>
-    <Version>1.0.0</Version>
-    <Authors>Jesper Bruhn Riddersholm</Authors>
-    <Company>Jesper Bruhn Riddersholm</Company>
-    <Product>BlazorEventBus</Product>
-    <Title>Blazor Event Bus</Title>
-    <Description>A lightweight, circuit-scoped event aggregator for Blazor enabling loosely coupled messaging between components. Supports synchronous and asynchronous handlers, deterministic disposal, and is thread-safe under concurrent publish/subscribe.</Description>
-    <PackageTags>blazor;event-bus;event-aggregator;messaging;pub-sub;mediator;components</PackageTags>
-    <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageProjectUrl>https://github.com/Riddersholm1/BlazorEventBus</PackageProjectUrl>
-    <RepositoryUrl>https://github.com/Riddersholm1/BlazorEventBus</RepositoryUrl>
-    <RepositoryType>git</RepositoryType>
-    <Copyright>Copyright (c) 2026 Jesper Bruhn Riddersholm</Copyright>
-
-    <!-- Symbols + SourceLink -->
-    <IncludeSymbols>true</IncludeSymbols>
-    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
-    <PublishRepositoryUrl>true</PublishRepositoryUrl>
-    <EmbedUntrackedSources>true</EmbedUntrackedSources>
-    <DebugType>portable</DebugType>
-  </PropertyGroup>
-
+		<!-- NuGet package metadata -->
+		<PackageId>Resultify</PackageId>
+		<Version>1.0.0</Version>
+		<Authors>Jesper Bruhn Riddersholm</Authors>
+		<Company>Jesper Bruhn Riddersholm</Company>
+		<Product>Resultify</Product>
+		<Title>Resultify</Title>
+		<Description>A modern, immutable, allocation-conscious Result pattern for .NET 10 / C# 14. Zero-allocation success path via readonly struct, first-class async pipelines, and a rich error model with codes, metadata, and causal chains.</Description>
+		<PackageTags>result;result-pattern;railway-oriented-programming;rop;functional;error-handling;ddd;clean-architecture;cqs</PackageTags>
+		<PackageLicenseExpression>MIT</PackageLicenseExpression>
+		<PackageReadmeFile>README.md</PackageReadmeFile>
+		<PackageProjectUrl>https://github.com/Riddersholm97/Resultify</PackageProjectUrl>
+		<RepositoryUrl>https://github.com/Riddersholm97/Resultify</RepositoryUrl>
+		<RepositoryType>git</RepositoryType>
+		<Copyright>Copyright (c) 2026 Jesper Bruhn Riddersholm</Copyright>
+		<DebugType>portable</DebugType>
+	</PropertyGroup>
 </Project>
