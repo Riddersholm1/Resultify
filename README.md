@@ -2,44 +2,48 @@
 
 A modern, **immutable** Result pattern library for **.NET 10 / C# 14**.
 
-Designed for Clean Architecture, DDD, and CQS codebases that want:
-
-- **Zero-allocation success path** — `Result` and `Result<TValue>` are structs
-- **Immutable errors with codes** — `Error(Code, Message)` records with metadata and causal chains
-- **Functional combinators** — `Map`, `Bind`, `Match`, `Tap`, `Ensure`, `Switch`
-- **First-class async** — every combinator has async overloads + fluent `Task<Result<T>>` extensions
-- **Multi-error support** — essential for validation aggregation, not just single errors
-- **No hidden state** — no global static configuration, no thread-safety pitfalls
+- Zero-allocation success path — `Result` and `Result<TValue>` are `readonly struct`
+- Immutable errors with machine-readable codes, metadata, and causal chains
+- Functional combinators — `Map`, `Bind`, `Match`, `Tap`, `Ensure`, `Switch`
+- First-class async — every combinator has an async overload + fluent `Task<Result<T>>` extensions
+- Multi-error support for validation aggregation
+- AOT and trimming compatible
+- Zero runtime dependencies
+- .NET 10 / C# 14
+- MIT licensed
 
 ## Installation
 
-```shell
+```sh
 dotnet add package Resultify
 ```
 
-## Quick Start
+## Quick start
 
 ```csharp
 using Resultify;
+using Resultify.Errors;
 
 // Success
-var result = Result<Customer>.Success(customer);
+Result<Customer> result = Result<Customer>.Success(customer);
 
 // Failure with a code + message
-var result = Result<Customer>.Failure("Customer.NotFound", "Customer does not exist");
+Result<Customer> result = Result<Customer>.Failure("Customer.NotFound", "Customer does not exist");
 
-// Null-safe creation — non-null becomes Success, null becomes a failure with Error.NullValue
-Result<Customer> result = customer;        // implicit conversion via Create
-Result<Customer> result = Result<Customer>.Create(customer);
+// Null-safe creation — non-null becomes Success, null becomes Failure(Error.NullValue)
+Result<Customer> result = customer;                         // implicit conversion
+Result<Customer> result = Result<Customer>.Create(customer); // explicit
 
 // Conditional factories
-var result = Result.SuccessIf(age >= 18, "Must be at least 18");
-var result = Result.FailureIf(string.IsNullOrEmpty(name), "Name is required");
+Result result = Result.SuccessIf(age >= 18, "Must be at least 18");
+Result result = Result.FailureIf(string.IsNullOrEmpty(name), "Name is required");
 ```
 
 ## Errors
 
-Errors are immutable `record` types with a machine-readable `Code` and a human-readable `Message`. The `Code` is useful for i18n, structured logs, and API responses.
+Errors are immutable `record` types with a machine-readable `Code` and a
+human-readable `Message`. The code is useful for i18n, structured logs, and
+API responses.
 
 ```csharp
 // Full form
@@ -54,7 +58,7 @@ Error.NullValue   // ("General.NullValue", "...")
 Error.Unknown     // ("General.Unknown", "...")
 ```
 
-### Metadata and Causes
+### Metadata and causes
 
 ```csharp
 var error = new Error("Payment.Failed", "Payment gateway rejected the transaction")
@@ -64,9 +68,9 @@ var error = new Error("Payment.Failed", "Payment gateway rejected the transactio
     .CausedBy(httpRequestException);
 ```
 
-### Domain Error Registries (DDD pattern)
+### Domain error registries (DDD pattern)
 
-Group your domain errors as static readonly fields, just like in Bookify-style codebases:
+Group your domain errors as `static readonly` fields — the Bookify convention:
 
 ```csharp
 public static class CustomerErrors
@@ -86,7 +90,19 @@ if (existing is not null)
     return Result<Customer>.Failure(CustomerErrors.EmailAlreadyInUse);
 ```
 
-### Custom Error Types
+### Built-in error types
+
+The library ships with five subtypes that set sensible codes out of the box:
+
+| Type | Default Code | Use case |
+|------|-------------|----------|
+| `ValidationError` | `Validation.Invalid` or `Validation.{Property}` | Input / business-rule validation |
+| `NotFoundError` | `NotFound` or `{Entity}.NotFound` | Lookup misses (HTTP 404) |
+| `ConflictError` | `Conflict` | Concurrency / duplicate conflicts (HTTP 409) |
+| `ForbiddenError` | `Forbidden` | Insufficient permissions (HTTP 403) |
+| `ExceptionalError` | `Exception.{TypeName}` | Wrapped exceptions from `Try` / `TryAsync` |
+
+### Custom error types
 
 ```csharp
 public sealed record InsufficientFundsError : Error
@@ -104,9 +120,7 @@ public sealed record InsufficientFundsError : Error
 }
 ```
 
-The library ships with five useful subtypes that set sensible codes: `ValidationError`, `NotFoundError`, `ConflictError`, `ForbiddenError`, and `ExceptionalError`.
-
-## Functional Combinators
+## Combinators
 
 ### Map — transform the value
 
@@ -114,7 +128,7 @@ The library ships with five useful subtypes that set sensible codes: `Validation
 Result<string> name = Result<Customer>.Success(customer).Map(c => c.FullName);
 ```
 
-### Bind — chain dependent operations (aka flatMap, SelectMany)
+### Bind — chain dependent operations
 
 ```csharp
 Result<Order> result = GetCustomer(id)
@@ -130,12 +144,20 @@ Result<int> result = Result<int>.Success(age)
     .Ensure(a => a <= 150, "Age seems unrealistic");
 ```
 
-### Match — collapse a Result into a value
+### Match — collapse into a value
 
 ```csharp
 IActionResult response = result.Match(
     onSuccess: value => Ok(value),
     onFailure: errors => BadRequest(errors[0].Message));
+```
+
+### Switch — side effects based on outcome
+
+```csharp
+result.Switch(
+    onSuccess: value => logger.LogInformation("Got {Value}", value),
+    onFailure: errors => logger.LogWarning("Failed: {Errors}", errors));
 ```
 
 ### Tap — side effects without changing the result
@@ -146,7 +168,14 @@ var result = GetCustomer(id)
     .Bind(c => CreateOrder(c));
 ```
 
-## Async Pipelines
+### TapError — side effects on failure
+
+```csharp
+var result = GetCustomer(id)
+    .TapError(errors => logger.LogWarning("Lookup failed: {Errors}", errors));
+```
+
+## Async pipelines
 
 Every combinator works seamlessly with `Task<Result<T>>`:
 
@@ -175,10 +204,14 @@ Result<int> result = await Result<int>.TryAsync(
     () => httpClient.GetFromJsonAsync<int>(url));
 ```
 
-Exceptional errors get a stable code like `Exception.InvalidOperationException` so you can query by exception type:
+`OperationCanceledException` and `TaskCanceledException` are never caught —
+they propagate as-is in both sync and async variants.
+
+Exceptional errors get a stable code like `Exception.InvalidOperationException`
+so you can query by exception type:
 
 ```csharp
-if (result.HasException<TimeoutException>()) { /* ... */ }
+if (result.HasException<TimeoutException>()) { /* retry */ }
 ```
 
 ## Merge
@@ -202,24 +235,13 @@ Result<IReadOnlyList<int>> merged = new[]
 // merged.Value == [1, 2, 3]
 ```
 
-## Error Querying
+## Error querying
 
 ```csharp
-// By type
-if (result.HasError<ValidationError>())
-    /* ... */
-
-// By type + predicate
-if (result.HasError<ValidationError>(e => e.PropertyName == "Email"))
-    /* ... */
-
-// By code (stable machine-readable identifier)
-if (result.HasErrorCode("Customer.NotFound"))
-    /* ... */
-
-// Wrapped exception
-if (result.HasException<TimeoutException>())
-    /* ... */
+if (result.HasError<ValidationError>())              // by type
+if (result.HasError<ValidationError>(e => e.PropertyName == "Email"))  // by type + predicate
+if (result.HasErrorCode("Customer.NotFound"))         // by code
+if (result.HasException<TimeoutException>())          // wrapped exception
 ```
 
 ## Deconstruction
@@ -229,16 +251,16 @@ var (isSuccess, errors) = Result.Failure("err");
 var (isSuccess, value, errors) = Result<int>.Success(42);
 ```
 
-## Implicit Conversions
+## Implicit conversions
 
 ```csharp
-Result<string> r = "hello";                  // via Create — Success when non-null
-Result<string> r = (string?)null;            // via Create — Failure with Error.NullValue
-Result r = new Error("fail");                // Failure
-Result<int> r = new Error("fail");           // Failure
+Result<string> r = "hello";           // Success (via Create)
+Result<string> r = (string?)null;     // Failure with Error.NullValue
+Result r = new Error("fail");         // Failure
+Result<int> r = new Error("fail");    // Failure
 ```
 
-## Integration with Clean Architecture / CQS
+## Clean Architecture / CQS integration
 
 ```csharp
 public sealed class CreateOrderHandler
@@ -255,29 +277,92 @@ public sealed class CreateOrderHandler
 }
 ```
 
-## Design Decisions
+## API at a glance
+
+### Result (non-generic)
+
+| Method | Description |
+|--------|-------------|
+| `Result.Success()` | Create a successful result |
+| `Result.Failure(error)` | Create a failed result |
+| `Result.SuccessIf(condition, error)` | Conditional success |
+| `Result.FailureIf(condition, error)` | Conditional failure |
+| `Result.Try(action)` | Catch exceptions as errors |
+| `Result.TryAsync(func)` | Async variant of `Try` |
+| `Result.Merge(...)` | Combine multiple results |
+| `result.Bind(func)` | Chain to another `Result` |
+| `result.Tap(action)` | Side effect on success |
+| `result.TapError(action)` | Side effect on failure |
+| `result.Ensure(predicate, error)` | Validation gate |
+| `result.Match(onSuccess, onFailure)` | Fold into a value |
+| `result.Switch(onSuccess, onFailure)` | Execute one of two actions |
+| `result.ToResult<T>(value)` | Convert to `Result<T>` |
+
+### Result&lt;TValue&gt;
+
+All of the above, plus:
+
+| Method | Description |
+|--------|-------------|
+| `Result<T>.Success(value)` | Create a successful result with a value |
+| `Result<T>.Create(value?)` | Null-safe factory |
+| `result.Map(func)` | Transform the value |
+| `result.ValueOrDefault` | Value or `default(T)` |
+| `result.ToResult()` | Drop the value, keep success/failure state |
+| `result.ToResult<TNew>(converter)` | Convert to a different value type |
+
+## Design decisions
 
 | Decision | Rationale |
 |---|---|
-| `struct` for Result types | Zero-allocation success path; value semantics |
-| `record` for Error types with positional `(Code, Message)` | Immutability via `with`; structural equality; inheritance for custom errors |
-| `Success` / `Failure` naming | Matches `IsSuccess` / `IsFailure` properties and common DDD/Bookify convention |
+| `readonly struct` for Result types | Zero-allocation success path; value semantics |
+| `record` for Error types | Immutability via `with`; structural equality; inheritance for custom errors |
+| `Success` / `Failure` naming | Matches `IsSuccess` / `IsFailure` and common DDD convention |
 | `Code` on every error | Machine-readable identifiers for i18n, logs, and API responses |
-| Multi-error support via `IReadOnlyList<Error>` | Validation aggregation is common and painful with single-error designs |
+| Multi-error via `IReadOnlyList<Error>` | Validation aggregation is common and painful with single-error designs |
 | `Create<T>(T?)` with null-handling | Ergonomic implicit conversion that defends against null references |
+| `Success(value)` rejects null | Prevents creating a "successful" result that throws on `.Value` access |
+| `Try` re-throws `OperationCanceledException` | Cancellation should propagate, not become an error |
 | No global static configuration | Thread-safe by default; no hidden coupling |
 | No `IError` / `IReason` interfaces | `record` inheritance covers extensibility without interface ceremony |
 | No `Success` reason objects | YAGNI for most codebases; success is the absence of errors |
 
-## Comparison with Bookify's Result pattern
+## FAQ
 
-The Bookify-style `Result` is a great teaching implementation. Resultify keeps its ergonomics (`Success`/`Failure`, `Create`, `Error` with code+message, implicit conversions) while addressing two practical limitations:
+**Why structs instead of classes?**
+A class-based result allocates on every call. Structs make the success path
+zero-alloc, which matters in tight loops and high-throughput handlers.
 
-- **Multiple errors** — Bookify's single `Error` slot makes validation aggregation awkward (you end up inventing comma-separated messages or concatenating Code strings). Resultify uses `IReadOnlyList<Error>` so `FluentValidation`-style aggregation is natural.
-- **Heap allocations** — Bookify's `Result` is a class, so every handler invocation allocates. Resultify is a struct, making the success path zero-alloc. This matters in tight loops like list projection or EF Core query translation.
+**What happens with `default(Result<string>)`?**
+Because `Result<T>` is a `readonly struct`, the runtime can produce
+`default` instances. A `default(Result<string>)` reports `IsSuccess = true`
+and `ValueOrDefault = null`, but accessing `.Value` throws
+`InvalidOperationException`. This is inherent to value types in .NET —
+prefer the factory methods (`Success`, `Failure`, `Create`) and avoid
+`default`.
 
-If you already have Bookify-style handlers, migration is mostly mechanical — rename `Result.Success/Failure` stays the same, `result.Error` still works (returns the first error or `Error.None`), and `Result.Create(value)` is identical.
+**Why no `IResult` interface?**
+An interface would box the struct, defeating the zero-allocation goal.
+Pattern-match or use generics constrained to the concrete types instead.
+
+**Can I use this with FluentValidation?**
+Yes. Collect `ValidationFailure` results into `ValidationError` instances
+and pass them to `Result.Failure(errors)`.
+
+**How does this compare to Bookify's Result pattern?**
+Resultify keeps Bookify's ergonomics (`Success`/`Failure`, `Create`,
+`Error` with code + message, implicit conversions) while addressing two
+practical limitations:
+
+- **Multiple errors** — Bookify's single `Error` slot makes validation
+  aggregation awkward. Resultify uses `IReadOnlyList<Error>`.
+- **Heap allocations** — Bookify's `Result` is a class. Resultify is a
+  struct, making the success path zero-alloc.
+
+Migration is mostly mechanical — `Result.Success`/`Failure` stays the same,
+`result.FirstError` replaces `result.Error`, and `Result.Create(value)` is
+identical.
 
 ## License
 
-MIT
+[MIT](LICENSE) © 2026 Jesper Bruhn Riddersholm

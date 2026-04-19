@@ -21,10 +21,23 @@
 		<PackageTags>result;result-pattern;railway-oriented-programming;rop;functional;error-handling;ddd;clean-architecture;cqs</PackageTags>
 		<PackageLicenseExpression>MIT</PackageLicenseExpression>
 		<PackageReadmeFile>README.md</PackageReadmeFile>
-		<PackageProjectUrl>https://github.com/Riddersholm97/Resultify</PackageProjectUrl>
-		<RepositoryUrl>https://github.com/Riddersholm97/Resultify</RepositoryUrl>
+		<PackageProjectUrl>https://github.com/Riddersholm1/Resultify</PackageProjectUrl>
+		<RepositoryUrl>https://github.com/Riddersholm1/Resultify</RepositoryUrl>
 		<RepositoryType>git</RepositoryType>
 		<Copyright>Copyright (c) 2026 Jesper Bruhn Riddersholm</Copyright>
+		<IncludeSymbols>true</IncludeSymbols>
+		<SymbolPackageFormat>snupkg</SymbolPackageFormat>
+		<PublishRepositoryUrl>true</PublishRepositoryUrl>
+		<EmbedUntrackedSources>true</EmbedUntrackedSources>
 		<DebugType>portable</DebugType>
 	</PropertyGroup>
+
+	<ItemGroup>
+		<None Include="..\..\README.md" Pack="true" PackagePath="\" />
+		<None Include="..\..\LICENSE" Pack="true" PackagePath="\" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <PackageReference Include="Microsoft.SourceLink.GitHub" Version="10.0.202" />
+	</ItemGroup>
 </Project>

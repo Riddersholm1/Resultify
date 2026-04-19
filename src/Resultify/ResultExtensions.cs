@@ -75,6 +75,13 @@ public static class ResultExtensions
             result.Errors.OfType<ExceptionalError>().Any(e => e.Exception is TException);
     }
 
+    extension<TValue>(Result<TValue> result)
+    {
+        /// <summary>Check if the result contains an error with the specified code.</summary>
+        public bool HasErrorCode(string code) =>
+            result.Errors.Any(e => e.Code == code);
+    }
+
     /// <summary>Check if the result contains an error of the specified type.</summary>
     public static bool HasError<TError, TValue>(this Result<TValue> result) where TError : Error =>
         result.Errors.OfType<TError>().Any();
@@ -82,10 +89,6 @@ public static class ResultExtensions
     /// <summary>Check if the result contains an error of the specified type matching a predicate.</summary>
     public static bool HasError<TError, TValue>(this Result<TValue> result, Func<TError, bool> predicate) where TError : Error =>
         result.Errors.OfType<TError>().Any(predicate);
-
-    /// <summary>Check if the result contains an error with the specified code.</summary>
-    public static bool HasErrorCode<TValue>(this Result<TValue> result, string code) =>
-        result.Errors.Any(e => e.Code == code);
 
     /// <summary>Check if any error in the result was caused by a specific exception type.</summary>
     public static bool HasException<TException, TValue>(this Result<TValue> result) where TException : Exception =>
@@ -143,6 +146,41 @@ public static class ResultExtensions
             Result<TValue> result = await resultTask.ConfigureAwait(false);
             return result.Match(onSuccess, onFailure);
         }
+
+        /// <summary>Async Match over an async Result pipeline.</summary>
+        public async Task<TOut> MatchAsync<TOut>(Func<TValue, Task<TOut>> onSuccess, Func<IReadOnlyList<Error>, Task<TOut>> onFailure)
+        {
+            Result<TValue> result = await resultTask.ConfigureAwait(false);
+            return await result.MatchAsync(onSuccess, onFailure).ConfigureAwait(false);
+        }
+
+        /// <summary>TapError over an async Result pipeline.</summary>
+        public async Task<Result<TValue>> TapError(Action<IReadOnlyList<Error>> action)
+        {
+            Result<TValue> result = await resultTask.ConfigureAwait(false);
+            return result.TapError(action);
+        }
+
+        /// <summary>Switch over an async Result pipeline.</summary>
+        public async Task Switch(Action<TValue> onSuccess, Action<IReadOnlyList<Error>> onFailure)
+        {
+            Result<TValue> result = await resultTask.ConfigureAwait(false);
+            result.Switch(onSuccess, onFailure);
+        }
+
+        /// <summary>Bind to non-generic Result over an async Result pipeline.</summary>
+        public async Task<Result> Bind(Func<TValue, Result> bind)
+        {
+            Result<TValue> result = await resultTask.ConfigureAwait(false);
+            return result.Bind(bind);
+        }
+
+        /// <summary>Async Bind to non-generic Result over an async Result pipeline.</summary>
+        public async Task<Result> BindAsync(Func<TValue, Task<Result>> bind)
+        {
+            Result<TValue> result = await resultTask.ConfigureAwait(false);
+            return await result.BindAsync(bind).ConfigureAwait(false);
+        }
     }
 
     extension(Task<Result> resultTask)
@@ -174,6 +212,20 @@ public static class ResultExtensions
         {
             Result result = await resultTask.ConfigureAwait(false);
             return result.Tap(action);
+        }
+
+        /// <summary>TapError over an async non-generic Result pipeline.</summary>
+        public async Task<Result> TapError(Action<IReadOnlyList<Error>> action)
+        {
+            Result result = await resultTask.ConfigureAwait(false);
+            return result.TapError(action);
+        }
+
+        /// <summary>Switch over an async non-generic Result pipeline.</summary>
+        public async Task Switch(Action onSuccess, Action<IReadOnlyList<Error>> onFailure)
+        {
+            Result result = await resultTask.ConfigureAwait(false);
+            result.Switch(onSuccess, onFailure);
         }
     }
 }

@@ -18,7 +18,7 @@ public readonly struct Result<TValue> : IEquatable<Result<TValue>>
     /// The first error, or <see cref="Error.None"/> if successful.
     /// Use <see cref="Errors"/> when you need all of them.
     /// </summary>
-    public Error Error => _errors is { Count: > 0 } ? _errors[0] : Error.None;
+    public Error FirstError => _errors is { Count: > 0 } ? _errors[0] : Error.None;
 
     /// <summary>True when the operation completed without errors.</summary>
     [MemberNotNullWhen(false, nameof(_errors))]
@@ -29,13 +29,29 @@ public readonly struct Result<TValue> : IEquatable<Result<TValue>>
     public bool IsFailure => !IsSuccess;
 
     /// <summary>
-    /// The value of the result. Throws <see cref="InvalidOperationException"/> if the result is failed.
+    /// The value of the result. Throws <see cref="InvalidOperationException"/> if the result is failed
+    /// or if the value is <c>null</c> (e.g. on a <c>default</c>-constructed struct for reference types).
     /// </summary>
     [NotNull]
-    public TValue Value => IsSuccess
-        ? ValueOrDefault!
-        : throw new InvalidOperationException(
-            $"Cannot access Value on a failed result. Errors: {string.Join("; ", Errors)}");
+    public TValue Value
+    {
+        get
+        {
+            if (IsFailure)
+            {
+                throw new InvalidOperationException(
+                    $"Cannot access Value on a failed result. Errors: {string.Join("; ", Errors)}");
+            }
+
+            if (ValueOrDefault is null)
+            {
+                throw new InvalidOperationException(
+                    "Cannot access Value when it is null. Use ValueOrDefault for nullable access.");
+            }
+
+            return ValueOrDefault;
+        }
+    }
 
     /// <summary>The value if successful; otherwise <c>default(TValue)</c>.</summary>
     public TValue? ValueOrDefault { get; }
@@ -55,7 +71,11 @@ public readonly struct Result<TValue> : IEquatable<Result<TValue>>
     // ── Factory methods ──────────────────────────────────────
 
     /// <summary>Create a successful result with the given value.</summary>
-    public static Result<TValue> Success(TValue value) => new(value);
+    public static Result<TValue> Success(TValue value)
+    {
+        ArgumentNullException.ThrowIfNull(value);
+        return new(value);
+    }
 
     /// <summary>Create a failed result from a single error.</summary>
     public static Result<TValue> Failure(Error error)
@@ -75,10 +95,10 @@ public readonly struct Result<TValue> : IEquatable<Result<TValue>>
     /// <summary>Create a failed result from multiple errors.</summary>
     public static Result<TValue> Failure(IEnumerable<Error> errors)
     {
-        IReadOnlyList<Error> list = errors as IReadOnlyList<Error> ?? errors.ToList();
-        return list.Count == 0
+        Error[] array = errors.ToArray();
+        return array.Length == 0
             ? throw new ArgumentException("At least one error is required.", nameof(errors))
-            : new Result<TValue>(list);
+            : new Result<TValue>(array);
     }
 
     /// <summary>
@@ -98,7 +118,11 @@ public readonly struct Result<TValue> : IEquatable<Result<TValue>>
     public static Result<TValue> SuccessIf(bool condition, TValue value, string errorMessage) =>
         condition ? Success(value) : Failure(errorMessage);
 
-    // ── Try ──────────────────────────────────────────────────
+    /// <summary>Returns Success if the condition is true; otherwise Failure with lazy error.</summary>
+    public static Result<TValue> SuccessIf(bool condition, TValue value, Func<Error> errorFactory) =>
+        condition ? Success(value) : Failure(errorFactory());
+
+    // ── Try
 
     /// <summary>Execute a function, catching exceptions as errors.</summary>
     public static Result<TValue> Try(Func<TValue> func, Func<Exception, Error>? exceptionHandler = null)
@@ -106,6 +130,10 @@ public readonly struct Result<TValue> : IEquatable<Result<TValue>>
         try
         {
             return Success(func());
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch (Exception ex)
         {
@@ -122,6 +150,10 @@ public readonly struct Result<TValue> : IEquatable<Result<TValue>>
         try
         {
             return Success(await func().ConfigureAwait(false));
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch (Exception ex)
         {

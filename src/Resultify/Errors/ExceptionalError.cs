@@ -16,9 +16,8 @@ public sealed record ExceptionalError : Error
     /// </summary>
     /// <param name="exception">The exception to wrap. Must not be null.</param>
     public ExceptionalError(Exception exception)
-        : base(BuildCode(exception), exception.Message)
+        : base(BuildCode(ValidateException(exception)), exception.Message)
     {
-        ArgumentNullException.ThrowIfNull(exception);
         Exception = exception;
     }
 
@@ -29,12 +28,17 @@ public sealed record ExceptionalError : Error
     /// <param name="message">A human-readable description of the error.</param>
     /// <param name="exception">The exception to wrap. Must not be null.</param>
     public ExceptionalError(string message, Exception exception)
-        : base(BuildCode(exception), message)
+        : base(BuildCode(ValidateException(exception)), message)
     {
-        ArgumentNullException.ThrowIfNull(exception);
         Exception = exception;
     }
 
-    private static string BuildCode(Exception? exception) =>
-        $"Exception.{exception?.GetType().Name ?? "Unknown"}";
+    private static Exception ValidateException(Exception exception)
+    {
+        ArgumentNullException.ThrowIfNull(exception);
+        return exception;
+    }
+
+    private static string BuildCode(Exception exception) =>
+        $"Exception.{exception.GetType().Name}";
 }

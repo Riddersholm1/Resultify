@@ -22,6 +22,10 @@ public record Error(string Code, string Message)
     /// <summary>Convenience constructor: create an error with just a message and an empty code.</summary>
     public Error(string message) : this(string.Empty, message) { }
 
+    // Validate positional parameters are not null.
+    private readonly string _code = Code ?? throw new ArgumentNullException(nameof(Code));
+    private readonly string _message = Message ?? throw new ArgumentNullException(nameof(Message));
+
     /// <summary>Structured metadata attached to this error.</summary>
     public IReadOnlyDictionary<string, object> Metadata { get; private init; } = ImmutableDictionary<string, object>.Empty;
 
@@ -31,20 +35,20 @@ public record Error(string Code, string Message)
     /// <summary>Attach a key-value metadata pair. Returns a new instance.</summary>
     public Error WithMetadata(string key, object value)
     {
-        var dict = new Dictionary<string, object>(Metadata) { [key] = value };
-        return this with { Metadata = dict.AsReadOnly() };
+        var builder = Metadata.ToImmutableDictionary().SetItem(key, value);
+        return this with { Metadata = builder };
     }
 
     /// <summary>Attach multiple metadata pairs. Returns a new instance.</summary>
     public Error WithMetadata(IEnumerable<KeyValuePair<string, object>> metadata)
     {
-        var dict = new Dictionary<string, object>(Metadata);
+        var builder = Metadata.ToImmutableDictionary().ToBuilder();
         foreach (KeyValuePair<string, object> kvp in metadata)
         {
-            dict[kvp.Key] = kvp.Value;
+            builder[kvp.Key] = kvp.Value;
         }
 
-        return this with { Metadata = dict.AsReadOnly() };
+        return this with { Metadata = builder.ToImmutable() };
     }
 
     /// <summary>Add a cause to the causal chain. Returns a new instance.</summary>
@@ -67,4 +71,39 @@ public record Error(string Code, string Message)
         string.IsNullOrEmpty(Code)
             ? Causes.Count > 0 ? $"{Message} (caused by: {string.Join(", ", Causes)})" : Message
             : Causes.Count > 0 ? $"[{Code}] {Message} (caused by: {string.Join(", ", Causes)})" : $"[{Code}] {Message}";
+
+    /// <inheritdoc />
+    public virtual bool Equals(Error? other)
+    {
+        if (other is null) return false;
+        if (ReferenceEquals(this, other)) return true;
+        if (EqualityContract != other.EqualityContract) return false;
+        if (Code != other.Code || Message != other.Message) return false;
+        if (!Causes.SequenceEqual(other.Causes)) return false;
+        if (Metadata.Count != other.Metadata.Count) return false;
+        foreach (var kvp in Metadata)
+        {
+            if (!other.Metadata.TryGetValue(kvp.Key, out var otherValue) ||
+                !Equals(kvp.Value, otherValue))
+                return false;
+        }
+        return true;
+    }
+
+    /// <inheritdoc />
+    public override int GetHashCode()
+    {
+        var hash = new HashCode();
+        hash.Add(EqualityContract);
+        hash.Add(Code);
+        hash.Add(Message);
+        foreach (var cause in Causes)
+            hash.Add(cause);
+        foreach (var kvp in Metadata.OrderBy(k => k.Key, StringComparer.Ordinal))
+        {
+            hash.Add(kvp.Key);
+            hash.Add(kvp.Value);
+        }
+        return hash.ToHashCode();
+    }
 }

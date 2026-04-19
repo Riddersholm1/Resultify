@@ -18,7 +18,7 @@ public readonly struct Result : IEquatable<Result>
     /// The first error, or <see cref="Error.None"/> if successful.
     /// Use <see cref="Errors"/> when you need all of them (e.g. validation aggregation).
     /// </summary>
-    public Error Error => _errors is { Count: > 0 } ? _errors[0] : Error.None;
+    public Error FirstError => _errors is { Count: > 0 } ? _errors[0] : Error.None;
 
     /// <summary>True when the operation completed without errors.</summary>
     [MemberNotNullWhen(false, nameof(_errors))]
@@ -56,10 +56,10 @@ public readonly struct Result : IEquatable<Result>
     /// <summary>Create a failed result from multiple errors.</summary>
     public static Result Failure(IEnumerable<Error> errors)
     {
-        IReadOnlyList<Error> list = errors as IReadOnlyList<Error> ?? errors.ToList();
-        return list.Count == 0
+        Error[] array = errors.ToArray();
+        return array.Length == 0
             ? throw new ArgumentException("At least one error is required.", nameof(errors))
-            : new Result(list);
+            : new Result(array);
     }
 
     /// <summary>Create a successful <see cref="Result{TValue}"/> with the given value.</summary>
@@ -115,6 +115,10 @@ public readonly struct Result : IEquatable<Result>
             action();
             return Success();
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
             Error error = exceptionHandler?.Invoke(ex) ?? new ExceptionalError(ex);
@@ -130,6 +134,10 @@ public readonly struct Result : IEquatable<Result>
             await action().ConfigureAwait(false);
             return Success();
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
             Error error = exceptionHandler?.Invoke(ex) ?? new ExceptionalError(ex);
@@ -143,6 +151,10 @@ public readonly struct Result : IEquatable<Result>
         try
         {
             return func();
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch (Exception ex)
         {
@@ -229,6 +241,10 @@ public readonly struct Result : IEquatable<Result>
     /// <summary>Add a validation gate. Evaluates the predicate only if currently successful.</summary>
     public Result Ensure(Func<bool> predicate, Error error) =>
         IsFailure ? this : predicate() ? this : Failure(error);
+
+    /// <summary>Add a validation gate with a lazy error factory.</summary>
+    public Result Ensure(Func<bool> predicate, Func<Error> errorFactory) =>
+        IsFailure ? this : predicate() ? this : Failure(errorFactory());
 
     /// <summary>Add a validation gate with a string error message.</summary>
     public Result Ensure(Func<bool> predicate, string errorMessage) =>

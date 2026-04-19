@@ -14,7 +14,7 @@ public sealed class ResultTests
         Assert.True(result.IsSuccess);
         Assert.False(result.IsFailure);
         Assert.Empty(result.Errors);
-        Assert.Equal(Error.None, result.Error);
+        Assert.Equal(Error.None, result.FirstError);
     }
 
     [Fact]
@@ -23,7 +23,7 @@ public sealed class ResultTests
         Result result = Result.Failure("Something went wrong");
 
         Assert.True(result.IsFailure);
-        Assert.Equal("Something went wrong", result.Error.Message);
+        Assert.Equal("Something went wrong", result.FirstError.Message);
     }
 
     [Fact]
@@ -31,8 +31,8 @@ public sealed class ResultTests
     {
         Result result = Result.Failure("User.NotFound", "User does not exist");
 
-        Assert.Equal("User.NotFound", result.Error.Code);
-        Assert.Equal("User does not exist", result.Error.Message);
+        Assert.Equal("User.NotFound", result.FirstError.Code);
+        Assert.Equal("User does not exist", result.FirstError.Message);
     }
 
     [Fact]
@@ -57,7 +57,7 @@ public sealed class ResultTests
         Result result = Result.SuccessIf(false, "Condition failed");
 
         Assert.True(result.IsFailure);
-        Assert.Equal("Condition failed", result.Error.Message);
+        Assert.Equal("Condition failed", result.FirstError.Message);
     }
 
     [Fact]
@@ -92,7 +92,7 @@ public sealed class ResultTests
         Result result = Result.Try(() => throw new InvalidOperationException("boom"));
 
         Assert.True(result.IsFailure);
-        Assert.IsType<ExceptionalError>(result.Error);
+        Assert.IsType<ExceptionalError>(result.FirstError);
     }
 
     [Fact]
@@ -100,7 +100,7 @@ public sealed class ResultTests
     {
         Result result = Result.Try(() => throw new InvalidOperationException("boom"));
 
-        Assert.Equal("Exception.InvalidOperationException", result.Error.Code);
+        Assert.Equal("Exception.InvalidOperationException", result.FirstError.Code);
     }
 
     // ── Merge ────────────────────────────────────────────────
@@ -185,7 +185,7 @@ public sealed class ResultTests
         Result result = Result.Success().Ensure(() => false, "Validation failed");
 
         Assert.True(result.IsFailure);
-        Assert.Equal("Validation failed", result.Error.Message);
+        Assert.Equal("Validation failed", result.FirstError.Message);
     }
 
     // ── Match ────────────────────────────────────────────────
@@ -277,7 +277,7 @@ public sealed class ResultTTests
         var result = Result<string>.Create(null);
 
         Assert.True(result.IsFailure);
-        Assert.Equal(Error.NullValue, result.Error);
+        Assert.Equal(Error.NullValue, result.FirstError);
     }
 
     [Fact]
@@ -296,7 +296,7 @@ public sealed class ResultTTests
         Result<string> result = value;
 
         Assert.True(result.IsFailure);
-        Assert.Equal(Error.NullValue, result.Error);
+        Assert.Equal(Error.NullValue, result.FirstError);
     }
 
     [Fact]
@@ -305,10 +305,10 @@ public sealed class ResultTTests
         var result = Result.Create<string>(null);
 
         Assert.True(result.IsFailure);
-        Assert.Equal(Error.NullValue, result.Error);
+        Assert.Equal(Error.NullValue, result.FirstError);
     }
 
-    // ── Try ──────────────────────────────────────────────────
+    // ── Try
 
     [Fact]
     public void Try_WhenNoException_ShouldReturnValue()
@@ -628,5 +628,408 @@ public sealed class AsyncPipelineTests
                 : Result<string>.Failure("Too small"));
 
         Assert.Equal("Big: 10", result.Value);
+    }
+
+    [Fact]
+    public async Task TryAsync_WhenOperationCanceled_ShouldRethrow()
+    {
+        await Assert.ThrowsAsync<OperationCanceledException>(
+            () => Result.TryAsync(() => throw new OperationCanceledException()));
+    }
+
+    [Fact]
+    public async Task TryAsync_Typed_WhenOperationCanceled_ShouldRethrow()
+    {
+        await Assert.ThrowsAsync<OperationCanceledException>(
+            () => Result<int>.TryAsync(() => throw new OperationCanceledException()));
+    }
+
+    [Fact]
+    public async Task TryAsync_WhenTaskCanceled_ShouldRethrow()
+    {
+        await Assert.ThrowsAsync<TaskCanceledException>(
+            () => Result.TryAsync(() => Task.FromCanceled(new CancellationToken(true))));
+    }
+
+    [Fact]
+    public async Task AsyncTyped_TapError_ShouldExecuteOnFailure()
+    {
+        var tapped = false;
+        await Task.FromResult(Result<int>.Failure("err"))
+            .TapError(_ => tapped = true);
+
+        Assert.True(tapped);
+    }
+
+    [Fact]
+    public async Task AsyncTyped_TapError_ShouldNotExecuteOnSuccess()
+    {
+        var tapped = false;
+        await Task.FromResult(Result<int>.Success(1))
+            .TapError(_ => tapped = true);
+
+        Assert.False(tapped);
+    }
+
+    [Fact]
+    public async Task AsyncTyped_Switch_ShouldCallOnSuccess()
+    {
+        var called = false;
+        await Task.FromResult(Result<int>.Success(42))
+            .Switch(v => called = v == 42, _ => { });
+
+        Assert.True(called);
+    }
+
+    [Fact]
+    public async Task AsyncTyped_Switch_ShouldCallOnFailure()
+    {
+        var called = false;
+        await Task.FromResult(Result<int>.Failure("err"))
+            .Switch(_ => { }, _ => called = true);
+
+        Assert.True(called);
+    }
+
+    [Fact]
+    public async Task AsyncTyped_MatchAsync_ShouldWork()
+    {
+        string output = await Task.FromResult(Result<int>.Success(5))
+            .MatchAsync(
+                v => Task.FromResult($"ok:{v}"),
+                _ => Task.FromResult("fail"));
+
+        Assert.Equal("ok:5", output);
+    }
+
+    [Fact]
+    public async Task AsyncTyped_BindToNonGenericResult_ShouldWork()
+    {
+        Result result = await Task.FromResult(Result<int>.Success(5))
+            .Bind(v => v > 0 ? Result.Success() : Result.Failure("negative"));
+
+        Assert.True(result.IsSuccess);
+    }
+
+    [Fact]
+    public async Task AsyncTyped_BindAsyncToNonGenericResult_ShouldWork()
+    {
+        Result result = await Task.FromResult(Result<int>.Success(5))
+            .BindAsync(v => Task.FromResult(v > 0 ? Result.Success() : Result.Failure("negative")));
+
+        Assert.True(result.IsSuccess);
+    }
+
+    [Fact]
+    public async Task AsyncNonGeneric_TapError_ShouldExecuteOnFailure()
+    {
+        var tapped = false;
+        await Task.FromResult(Result.Failure("err"))
+            .TapError(_ => tapped = true);
+
+        Assert.True(tapped);
+    }
+
+    [Fact]
+    public async Task AsyncNonGeneric_Switch_ShouldCallOnSuccess()
+    {
+        var called = false;
+        await Task.FromResult(Result.Success())
+            .Switch(() => called = true, _ => { });
+
+        Assert.True(called);
+    }
+}
+
+public sealed class DefaultResultBehaviorTests
+{
+    [Fact]
+    public void DefaultResultT_IsSuccess_WithDefaultValue()
+    {
+        Result<int> result = default;
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(0, result.Value);
+        Assert.Empty(result.Errors);
+    }
+
+    [Fact]
+    public void DefaultResultT_String_IsSuccess_ButValueThrows()
+    {
+        Result<string> result = default;
+
+        Assert.True(result.IsSuccess);
+        Assert.Null(result.ValueOrDefault);
+        Assert.Throws<InvalidOperationException>(() => result.Value);
+    }
+
+    [Fact]
+    public void DefaultResult_IsSuccess()
+    {
+        Result result = default;
+
+        Assert.True(result.IsSuccess);
+        Assert.Empty(result.Errors);
+    }
+}
+
+public sealed class DefensiveCopyTests
+{
+    [Fact]
+    public void Failure_WithListOfErrors_ShouldNotMutateWhenCallerMutatesSource()
+    {
+        var errors = new List<Error> { new("err1"), new("err2") };
+        Result result = Result.Failure(errors);
+
+        errors.Add(new Error("err3"));
+        errors.Clear();
+
+        Assert.Equal(2, result.Errors.Count);
+    }
+
+    [Fact]
+    public void FailureT_WithListOfErrors_ShouldNotMutateWhenCallerMutatesSource()
+    {
+        var errors = new List<Error> { new("err1") };
+        Result<int> result = Result<int>.Failure(errors);
+
+        errors.Add(new Error("err2"));
+
+        Assert.Single(result.Errors);
+    }
+}
+
+public sealed class ErrorEqualityTests
+{
+    [Fact]
+    public void Errors_WithSameMetadata_ShouldBeEqual()
+    {
+        Error a = new Error("C", "M").WithMetadata("key", "value");
+        Error b = new Error("C", "M").WithMetadata("key", "value");
+
+        Assert.Equal(a, b);
+        Assert.Equal(a.GetHashCode(), b.GetHashCode());
+    }
+
+    [Fact]
+    public void Errors_WithDifferentMetadata_ShouldNotBeEqual()
+    {
+        Error a = new Error("C", "M").WithMetadata("key", "value1");
+        Error b = new Error("C", "M").WithMetadata("key", "value2");
+
+        Assert.NotEqual(a, b);
+    }
+
+    [Fact]
+    public void Errors_WithSameCauses_ShouldBeEqual()
+    {
+        var cause = new Error("cause");
+        Error a = new Error("C", "M").CausedBy(cause);
+        Error b = new Error("C", "M").CausedBy(cause);
+
+        Assert.Equal(a, b);
+        Assert.Equal(a.GetHashCode(), b.GetHashCode());
+    }
+
+    [Fact]
+    public void Errors_WithDifferentCauses_ShouldNotBeEqual()
+    {
+        Error a = new Error("C", "M").CausedBy(new Error("cause1"));
+        Error b = new Error("C", "M").CausedBy(new Error("cause2"));
+
+        Assert.NotEqual(a, b);
+    }
+
+    [Fact]
+    public void Errors_WithMultipleMetadata_ShouldBeEqual()
+    {
+        Error a = new Error("C", "M")
+            .WithMetadata("k1", "v1")
+            .WithMetadata("k2", 42);
+        Error b = new Error("C", "M")
+            .WithMetadata("k1", "v1")
+            .WithMetadata("k2", 42);
+
+        Assert.Equal(a, b);
+    }
+}
+
+public sealed class HasErrorOnResultTTests
+{
+    [Fact]
+    public void HasError_OnTypedResult_ShouldDetectErrorType()
+    {
+        Result<int> result = Result<int>.Failure(new ValidationError("Name", "Required"));
+
+        Assert.True(result.HasError<ValidationError, int>());
+        Assert.False(result.HasError<NotFoundError, int>());
+    }
+
+    [Fact]
+    public void HasError_WithPredicate_OnTypedResult_ShouldWork()
+    {
+        Result<int> result = Result<int>.Failure(new ValidationError("Email", "Invalid"));
+
+        Assert.True(result.HasError<ValidationError, int>(e => e.PropertyName == "Email"));
+        Assert.False(result.HasError<ValidationError, int>(e => e.PropertyName == "Name"));
+    }
+
+    [Fact]
+    public void HasErrorCode_OnTypedResult_ShouldWork()
+    {
+        Result<int> result = Result<int>.Failure("User.NotFound", "gone");
+
+        Assert.True(result.HasErrorCode("User.NotFound"));
+        Assert.False(result.HasErrorCode("Other"));
+    }
+
+    [Fact]
+    public void HasException_OnTypedResult_ShouldWork()
+    {
+        Result<int> result = Result<int>.Try(() => throw new InvalidOperationException());
+
+        Assert.True(result.HasException<InvalidOperationException, int>());
+        Assert.False(result.HasException<ArgumentException, int>());
+    }
+}
+
+public sealed class EmptyMergeTests
+{
+    [Fact]
+    public void Merge_EmptyCollection_ShouldSucceed()
+    {
+        Result merged = Array.Empty<Result>().Merge();
+
+        Assert.True(merged.IsSuccess);
+    }
+
+    [Fact]
+    public void Merge_EmptyTypedCollection_ShouldSucceedWithEmptyValues()
+    {
+        Result<IReadOnlyList<int>> merged = Array.Empty<Result<int>>().Merge();
+
+        Assert.True(merged.IsSuccess);
+        Assert.Empty(merged.Value);
+    }
+
+    [Fact]
+    public void Merge_Span_NoArgs_ShouldSucceed()
+    {
+        Result merged = Result.Merge();
+
+        Assert.True(merged.IsSuccess);
+    }
+}
+
+public sealed class ExceptionalErrorNullTests
+{
+    [Fact]
+    public void ExceptionalError_WithNullException_ShouldThrow()
+    {
+        Assert.Throws<ArgumentNullException>(() => new ExceptionalError(null!));
+    }
+
+    [Fact]
+    public void ExceptionalError_WithNullExceptionAndMessage_ShouldThrow()
+    {
+        Assert.Throws<ArgumentNullException>(() => new ExceptionalError("msg", null!));
+    }
+}
+
+public sealed class ErrorNullValidationTests
+{
+    [Fact]
+    public void Error_WithNullCode_ShouldThrow()
+    {
+        Assert.Throws<ArgumentNullException>(() => new Error(null!, "message"));
+    }
+
+    [Fact]
+    public void Error_WithNullMessage_ShouldThrow()
+    {
+        Assert.Throws<ArgumentNullException>(() => new Error("code", null!));
+    }
+}
+
+public sealed class LazyEnsureAndSuccessIfTests
+{
+    [Fact]
+    public void Result_Ensure_WithLazyErrorFactory_ShouldNotCallFactoryOnSuccess()
+    {
+        var called = false;
+        Result result = Result.Success().Ensure(() => true, () =>
+        {
+            called = true;
+            return new Error("should not be created");
+        });
+
+        Assert.True(result.IsSuccess);
+        Assert.False(called);
+    }
+
+    [Fact]
+    public void Result_Ensure_WithLazyErrorFactory_ShouldCallFactoryOnPredicateFalse()
+    {
+        Result result = Result.Success().Ensure(() => false, () => new Error("lazy error"));
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("lazy error", result.FirstError.Message);
+    }
+
+    [Fact]
+    public void ResultT_SuccessIf_WithLazyErrorFactory_ShouldSucceed()
+    {
+        var called = false;
+        Result<int> result = Result<int>.SuccessIf(true, 42, () =>
+        {
+            called = true;
+            return new Error("should not be created");
+        });
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(42, result.Value);
+        Assert.False(called);
+    }
+
+    [Fact]
+    public void ResultT_SuccessIf_WithLazyErrorFactory_ShouldFail()
+    {
+        Result<int> result = Result<int>.SuccessIf(false, 42, () => new Error("lazy"));
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("lazy", result.FirstError.Message);
+    }
+}
+
+public sealed class SuccessNullGuardTests
+{
+    [Fact]
+    public void ResultT_Success_WithNull_ShouldThrow()
+    {
+        Assert.Throws<ArgumentNullException>(() => Result<string>.Success(null!));
+    }
+}
+
+public sealed class SyncTryCancellationTests
+{
+    [Fact]
+    public void Try_Action_WhenOperationCanceled_ShouldRethrow()
+    {
+        Assert.Throws<OperationCanceledException>(
+            () => Result.Try(() => throw new OperationCanceledException()));
+    }
+
+    [Fact]
+    public void Try_FuncResult_WhenOperationCanceled_ShouldRethrow()
+    {
+        Assert.Throws<OperationCanceledException>(
+            () => Result.Try(() => throw new OperationCanceledException()));
+    }
+
+    [Fact]
+    public void TryT_WhenOperationCanceled_ShouldRethrow()
+    {
+        Assert.Throws<OperationCanceledException>(
+            () => Result<int>.Try(() => throw new OperationCanceledException()));
     }
 }
