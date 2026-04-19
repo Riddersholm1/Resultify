@@ -70,7 +70,7 @@ var error = new Error("Payment.Failed", "Payment gateway rejected the transactio
 
 ### Domain error registries (DDD pattern)
 
-Group your domain errors as `static readonly` fields — the Bookify convention:
+Group your domain errors as `static readonly` fields:
 
 ```csharp
 public static class CustomerErrors
@@ -348,20 +348,6 @@ Pattern-match or use generics constrained to the concrete types instead.
 **Can I use this with FluentValidation?**
 Yes. Collect `ValidationFailure` results into `ValidationError` instances
 and pass them to `Result.Failure(errors)`.
-
-**How does this compare to Bookify's Result pattern?**
-Resultify keeps Bookify's ergonomics (`Success`/`Failure`, `Create`,
-`Error` with code + message, implicit conversions) while addressing two
-practical limitations:
-
-- **Multiple errors** — Bookify's single `Error` slot makes validation
-  aggregation awkward. Resultify uses `IReadOnlyList<Error>`.
-- **Heap allocations** — Bookify's `Result` is a class. Resultify is a
-  struct, making the success path zero-alloc.
-
-Migration is mostly mechanical — `Result.Success`/`Failure` stays the same,
-`result.FirstError` replaces `result.Error`, and `Result.Create(value)` is
-identical.
 
 ## License
 

@@ -12,14 +12,13 @@
     Target = "~T:Resultify.Result`1")]
 
 // CA1716: 'Error' is a reserved keyword in VB.NET, but the domain-driven design convention
-// popularised by Bookify and reinforced by FluentResults-style libraries is to name the
-// error record exactly 'Error'. The type lives in the Resultify.Errors namespace, so
-// consumers who need to disambiguate can alias. Renaming to 'ErrorInfo' or similar would
-// hurt the ergonomics this library is explicitly designed for.
+// is to name the error record exactly 'Error'. The type lives in the Resultify.Errors
+// namespace, so consumers who need to disambiguate can alias. Renaming to 'ErrorInfo' or
+// similar would hurt the ergonomics this library is explicitly designed for.
 [assembly: SuppressMessage(
     "Naming",
     "CA1716:Identifiers should not match keywords",
-    Justification = "'Error' matches the DDD/Bookify convention and is a deliberate API choice.",
+    Justification = "'Error' matches the DDD convention and is a deliberate API choice.",
     Scope = "type",
     Target = "~T:Resultify.Errors.Error")]
 
