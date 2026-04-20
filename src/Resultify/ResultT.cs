@@ -74,7 +74,7 @@ public readonly struct Result<TValue> : IEquatable<Result<TValue>>
     public static Result<TValue> Success(TValue value)
     {
         ArgumentNullException.ThrowIfNull(value);
-        return new(value);
+        return new Result<TValue>(value);
     }
 
     /// <summary>Create a failed result from a single error.</summary>

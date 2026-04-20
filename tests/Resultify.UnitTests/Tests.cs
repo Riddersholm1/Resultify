@@ -539,10 +539,13 @@ public sealed class ResultExtensionTests
             Result<int>.Success(3)
         ];
 
+        int[] expected = [1, 2, 3];
+
+
         Result<IReadOnlyList<int>> merged = results.Merge();
 
         Assert.True(merged.IsSuccess);
-        Assert.Equivalent(new[] { 1, 2, 3 }, merged.Value);
+        Assert.Equivalent(expected, merged.Value);
     }
 
     [Fact]

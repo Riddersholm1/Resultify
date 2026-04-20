@@ -35,14 +35,14 @@ public record Error(string Code, string Message)
     /// <summary>Attach a key-value metadata pair. Returns a new instance.</summary>
     public Error WithMetadata(string key, object value)
     {
-        var builder = Metadata.ToImmutableDictionary().SetItem(key, value);
+        ImmutableDictionary<string, object> builder = Metadata.ToImmutableDictionary().SetItem(key, value);
         return this with { Metadata = builder };
     }
 
     /// <summary>Attach multiple metadata pairs. Returns a new instance.</summary>
     public Error WithMetadata(IEnumerable<KeyValuePair<string, object>> metadata)
     {
-        var builder = Metadata.ToImmutableDictionary().ToBuilder();
+        ImmutableDictionary<string, object>.Builder builder = Metadata.ToImmutableDictionary().ToBuilder();
         foreach (KeyValuePair<string, object> kvp in metadata)
         {
             builder[kvp.Key] = kvp.Value;
@@ -75,17 +75,43 @@ public record Error(string Code, string Message)
     /// <inheritdoc />
     public virtual bool Equals(Error? other)
     {
-        if (other is null) return false;
-        if (ReferenceEquals(this, other)) return true;
-        if (EqualityContract != other.EqualityContract) return false;
-        if (Code != other.Code || Message != other.Message) return false;
-        if (!Causes.SequenceEqual(other.Causes)) return false;
-        if (Metadata.Count != other.Metadata.Count) return false;
-        foreach (var kvp in Metadata)
+        if (other is null)
         {
-            if (!other.Metadata.TryGetValue(kvp.Key, out var otherValue) ||
+            return false;
+        }
+
+        if (ReferenceEquals(this, other))
+        {
+            return true;
+        }
+
+        if (EqualityContract != other.EqualityContract)
+        {
+            return false;
+        }
+
+        if (Code != other.Code || Message != other.Message)
+        {
+            return false;
+        }
+
+        if (!Causes.SequenceEqual(other.Causes))
+        {
+            return false;
+        }
+
+        if (Metadata.Count != other.Metadata.Count)
+        {
+            return false;
+        }
+
+        foreach (KeyValuePair<string, object> kvp in Metadata)
+        {
+            if (!other.Metadata.TryGetValue(kvp.Key, out object? otherValue) ||
                 !Equals(kvp.Value, otherValue))
+            {
                 return false;
+            }
         }
         return true;
     }
@@ -97,9 +123,12 @@ public record Error(string Code, string Message)
         hash.Add(EqualityContract);
         hash.Add(Code);
         hash.Add(Message);
-        foreach (var cause in Causes)
+        foreach (Error cause in Causes)
+        {
             hash.Add(cause);
-        foreach (var kvp in Metadata.OrderBy(k => k.Key, StringComparer.Ordinal))
+        }
+
+        foreach (KeyValuePair<string, object> kvp in Metadata.OrderBy(k => k.Key, StringComparer.Ordinal))
         {
             hash.Add(kvp.Key);
             hash.Add(kvp.Value);
