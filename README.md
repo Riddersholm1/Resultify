@@ -290,11 +290,15 @@ public sealed class CreateOrderHandler
 | `Result.Try(action)` | Catch exceptions as errors |
 | `Result.TryAsync(func)` | Async variant of `Try` |
 | `Result.Merge(...)` | Combine multiple results |
+| `result.FirstError` | The first error, or `Error.None` if successful |
 | `result.Bind(func)` | Chain to another `Result` |
+| `result.BindAsync(func)` | Async variant of `Bind` |
 | `result.Tap(action)` | Side effect on success |
+| `result.TapAsync(func)` | Async variant of `Tap` |
 | `result.TapError(action)` | Side effect on failure |
 | `result.Ensure(predicate, error)` | Validation gate |
 | `result.Match(onSuccess, onFailure)` | Fold into a value |
+| `result.MatchAsync(onSuccess, onFailure)` | Async variant of `Match` |
 | `result.Switch(onSuccess, onFailure)` | Execute one of two actions |
 | `result.ToResult<T>(value)` | Convert to `Result<T>` |
 
@@ -306,7 +310,9 @@ All of the above, plus:
 |--------|-------------|
 | `Result<T>.Success(value)` | Create a successful result with a value |
 | `Result<T>.Create(value?)` | Null-safe factory |
+| `Result<T>.SuccessIf(condition, value, error)` | Conditional success with a value |
 | `result.Map(func)` | Transform the value |
+| `result.MapAsync(func)` | Async variant of `Map` |
 | `result.ValueOrDefault` | Value or `default(T)` |
 | `result.ToResult()` | Drop the value, keep success/failure state |
 | `result.ToResult<TNew>(converter)` | Convert to a different value type |
