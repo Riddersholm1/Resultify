@@ -17,7 +17,7 @@
 		<Company>Jesper Bruhn Riddersholm</Company>
 		<Product>Resultify</Product>
 		<Title>Resultify</Title>
-		<Description>A modern, immutable, allocation-conscious Result pattern for .NET 10 / C# 14. Zero-allocation success path via readonly struct, first-class async pipelines, and a rich error model with codes, metadata, and causal chains.</Description>
+		<Description>A modern, immutable, allocation-conscious Result pattern for .NET 10. Zero-allocation success path via readonly struct, first-class async pipelines, and a rich error model with codes, metadata, and causal chains.</Description>
 		<PackageTags>result;result-pattern;railway-oriented-programming;rop;functional;error-handling;ddd;clean-architecture;cqs</PackageTags>
 		<PackageLicenseExpression>MIT</PackageLicenseExpression>
 		<PackageReadmeFile>README.md</PackageReadmeFile>
@@ -39,5 +39,9 @@
 
 	<ItemGroup>
 	  <PackageReference Include="Microsoft.SourceLink.GitHub" Version="10.0.202" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<InternalsVisibleTo Include="Resultify.Tests" />
 	</ItemGroup>
 </Project>

@@ -1,6 +1,6 @@
 using Resultify.Errors;
 
-namespace Resultify.UnitTests;
+namespace Resultify.Tests;
 
 public sealed class ResultTests
 {

@@ -1,6 +1,6 @@
 # Resultify
 
-A modern, **immutable** Result pattern library for **.NET 10 / C# 14**.
+A modern, **immutable** Result pattern library for **.NET 10**.
 
 - Zero-allocation success path — `Result` and `Result<TValue>` are `readonly struct`
 - Immutable errors with machine-readable codes, metadata, and causal chains

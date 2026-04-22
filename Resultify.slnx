@@ -1,5 +1,6 @@
 <Solution>
   <Folder Name="/.SolutionItems/">
+    <File Path=".github/workflows/pipeline.yml" />
     <File Path=".gitignore" />
     <File Path="LICENSE" />
     <File Path="README.md" />
@@ -8,6 +9,6 @@
     <Project Path="src/Resultify/Resultify.csproj" />
   </Folder>
   <Folder Name="/tests/">
-    <Project Path="tests/Resultify.UnitTests/Resultify.UnitTests.csproj" />
+    <Project Path="tests/Resultify.Tests/Resultify.Tests.csproj" />
   </Folder>
 </Solution>
