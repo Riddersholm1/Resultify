@@ -6,6 +6,7 @@ namespace Resultify;
 /// <summary>
 /// Represents the outcome of an operation that has no return value.
 /// Value type — zero-allocation on the success path.
+/// Instances are immutable and safe to share across threads.
 /// </summary>
 public readonly struct Result : IEquatable<Result>
 {
@@ -298,10 +299,21 @@ public readonly struct Result : IEquatable<Result>
     // ── Implicit conversions ─────────────────────────────────
 
     /// <summary>Implicitly convert a single <see cref="Error"/> to a failed <see cref="Result"/>.</summary>
-    public static implicit operator Result(Error error) => Failure(error);
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="error"/> is null.</exception>
+    public static implicit operator Result(Error error)
+    {
+        ArgumentNullException.ThrowIfNull(error);
+        return Failure(error);
+    }
 
     /// <summary>Implicitly convert a list of <see cref="Error"/>s to a failed <see cref="Result"/>.</summary>
-    public static implicit operator Result(List<Error> errors) => Failure(errors);
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="errors"/> is null.</exception>
+    /// <exception cref="ArgumentException">Thrown when <paramref name="errors"/> is empty.</exception>
+    public static implicit operator Result(List<Error> errors)
+    {
+        ArgumentNullException.ThrowIfNull(errors);
+        return Failure(errors);
+    }
 
     // ── Equality ─────────────────────────────────────────────
 

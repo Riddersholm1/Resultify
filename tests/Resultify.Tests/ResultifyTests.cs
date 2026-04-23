@@ -1036,3 +1036,302 @@ public sealed class SyncTryCancellationTests
             () => Result<int>.Try(() => throw new OperationCanceledException()));
     }
 }
+
+public sealed class TapIdentityTests
+{
+    [Fact]
+    public void Tap_OnResult_ReturnsEquivalentResult()
+    {
+        Result original = Result.Success();
+        Result tapped = original.Tap(() => { });
+
+        Assert.Equal(original, tapped);
+        Assert.True(tapped.IsSuccess);
+    }
+
+    [Fact]
+    public void Tap_OnResultT_ReturnsEquivalentResult()
+    {
+        Result<int> original = Result<int>.Success(42);
+        Result<int> tapped = original.Tap(_ => { });
+
+        Assert.Equal(original, tapped);
+        Assert.Equal(42, tapped.Value);
+    }
+
+    [Fact]
+    public void TapError_OnFailedResult_ReturnsEquivalentResult()
+    {
+        Result original = Result.Failure("err");
+        Result tapped = original.TapError(_ => { });
+
+        Assert.Equal(original, tapped);
+    }
+
+    [Fact]
+    public void TapError_OnFailedResultT_ReturnsEquivalentResult()
+    {
+        Result<int> original = Result<int>.Failure("err");
+        Result<int> tapped = original.TapError(_ => { });
+
+        Assert.Equal(original, tapped);
+    }
+}
+
+public sealed class ResultTEnsureLazyFactoryTests
+{
+    [Fact]
+    public void ResultT_Ensure_WithLazyErrorFactory_ShouldNotCallFactoryOnPass()
+    {
+        var called = false;
+        Result<int> result = Result<int>.Success(42).Ensure(
+            v => v > 0,
+            v =>
+            {
+                called = true;
+                return new Error($"v={v}");
+            });
+
+        Assert.True(result.IsSuccess);
+        Assert.False(called);
+    }
+
+    [Fact]
+    public void ResultT_Ensure_WithLazyErrorFactory_ShouldCallFactoryOnFail()
+    {
+        Result<int> result = Result<int>.Success(3).Ensure(
+            v => v > 5,
+            v => new Error($"v={v} too small"));
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("v=3 too small", result.FirstError.Message);
+    }
+
+    [Fact]
+    public void ResultT_Ensure_WithLazyErrorFactory_ShouldSkipOnAlreadyFailed()
+    {
+        var called = false;
+        Result<int> result = Result<int>.Failure("earlier").Ensure(
+            v => v > 0,
+            v =>
+            {
+                called = true;
+                return new Error("should not run");
+            });
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("earlier", result.FirstError.Message);
+        Assert.False(called);
+    }
+}
+
+public sealed class ToStringTests
+{
+    [Fact]
+    public void Result_Success_ToString_ShouldBeReadable()
+    {
+        Assert.Equal("Result: Success", Result.Success().ToString());
+    }
+
+    [Fact]
+    public void Result_Failure_ToString_ShouldContainErrorText()
+    {
+        string text = Result.Failure("code", "bad").ToString();
+
+        Assert.Contains("Failure", text);
+        Assert.Contains("code", text);
+        Assert.Contains("bad", text);
+    }
+
+    [Fact]
+    public void ResultT_Success_ToString_ShouldContainValue()
+    {
+        string text = Result<int>.Success(42).ToString();
+
+        Assert.Contains("Success", text);
+        Assert.Contains("42", text);
+        Assert.Contains("Int32", text);
+    }
+
+    [Fact]
+    public void ResultT_DefaultForReferenceType_ToString_ShouldNotThrow()
+    {
+        Result<string> result = default;
+
+        string text = result.ToString();
+
+        Assert.Contains("Success", text);
+        Assert.Contains("null", text);
+    }
+
+    [Fact]
+    public void ResultT_Failure_ToString_ShouldContainErrors()
+    {
+        string text = Result<int>.Failure("boom").ToString();
+
+        Assert.Contains("Failure", text);
+        Assert.Contains("boom", text);
+    }
+
+    [Fact]
+    public void Error_ToString_WithCausesAndCode_ShouldIncludeAll()
+    {
+        Error err = new Error("Top.Code", "top").CausedBy(new Error("root"));
+
+        string text = err.ToString();
+
+        Assert.Contains("Top.Code", text);
+        Assert.Contains("top", text);
+        Assert.Contains("root", text);
+        Assert.Contains("caused by", text);
+    }
+}
+
+public sealed class ErrorSubtypeEqualityTests
+{
+    [Fact]
+    public void NotFoundError_ShouldNotEqualPlainErrorWithMatchingCodeAndMessage()
+    {
+        var notFound = new NotFoundError("Customer", 42);
+        var plain = new Error(notFound.Code, notFound.Message);
+
+        Assert.NotEqual<Error>(notFound, plain);
+        Assert.NotEqual<Error>(plain, notFound);
+    }
+
+    [Fact]
+    public void ValidationError_ShouldNotEqualPlainErrorWithMatchingCodeAndMessage()
+    {
+        var vErr = new ValidationError("Email", "Required");
+        var plain = new Error(vErr.Code, vErr.Message);
+
+        Assert.NotEqual<Error>(vErr, plain);
+    }
+
+    [Fact]
+    public void ExceptionalError_WithDifferentExceptionInstances_ShouldNotBeEqual()
+    {
+        var a = new ExceptionalError(new InvalidOperationException("same"));
+        var b = new ExceptionalError(new InvalidOperationException("same"));
+
+        Assert.NotEqual<Error>(a, b);
+    }
+
+    [Fact]
+    public void ExceptionalError_WithSameExceptionInstance_ShouldBeEqual()
+    {
+        var ex = new InvalidOperationException("same");
+        var a = new ExceptionalError(ex);
+        var b = new ExceptionalError(ex);
+
+        Assert.Equal<Error>(a, b);
+        Assert.Equal(a.GetHashCode(), b.GetHashCode());
+    }
+
+    [Fact]
+    public void NotFoundError_WithSameEntityAndId_ShouldBeEqual()
+    {
+        var a = new NotFoundError("Customer", 42);
+        var b = new NotFoundError("Customer", 42);
+
+        Assert.Equal<Error>(a, b);
+    }
+}
+
+public sealed class MetadataAndCausesCombinationTests
+{
+    [Fact]
+    public void Error_WithMetadataThenCausedBy_ShouldKeepBoth()
+    {
+        Error err = new Error("C", "M")
+            .WithMetadata("key", "value")
+            .CausedBy(new Error("cause"));
+
+        Assert.Equal("value", err.Metadata["key"]);
+        Assert.Single(err.Causes);
+        Assert.Equal("cause", err.Causes[0].Message);
+    }
+
+    [Fact]
+    public void Error_CausedByThenWithMetadata_ShouldKeepBoth()
+    {
+        Error err = new Error("C", "M")
+            .CausedBy(new Error("cause"))
+            .WithMetadata("key", "value");
+
+        Assert.Equal("value", err.Metadata["key"]);
+        Assert.Single(err.Causes);
+    }
+
+    [Fact]
+    public void Error_MetadataAndCauses_ShouldBeOrderIndependentForEquality()
+    {
+        Error a = new Error("C", "M")
+            .WithMetadata("key", "value")
+            .CausedBy(new Error("cause"));
+
+        Error b = new Error("C", "M")
+            .CausedBy(new Error("cause"))
+            .WithMetadata("key", "value");
+
+        Assert.Equal(a, b);
+        Assert.Equal(a.GetHashCode(), b.GetHashCode());
+    }
+
+    [Fact]
+    public void Error_MultipleWithMetadataChains_ShouldAccumulate()
+    {
+        Error err = new Error("C", "M")
+            .WithMetadata("k1", 1)
+            .WithMetadata("k2", 2)
+            .WithMetadata("k3", 3);
+
+        Assert.Equal(3, err.Metadata.Count);
+        Assert.Equal(1, err.Metadata["k1"]);
+        Assert.Equal(2, err.Metadata["k2"]);
+        Assert.Equal(3, err.Metadata["k3"]);
+    }
+}
+
+public sealed class ImplicitOperatorNullGuardTests
+{
+    [Fact]
+    public void Result_ImplicitFromNullError_ShouldThrow()
+    {
+        Assert.Throws<ArgumentNullException>(() =>
+        {
+            Error? nullError = null;
+            Result _ = nullError!;
+        });
+    }
+
+    [Fact]
+    public void Result_ImplicitFromNullList_ShouldThrow()
+    {
+        Assert.Throws<ArgumentNullException>(() =>
+        {
+            List<Error>? nullList = null;
+            Result _ = nullList!;
+        });
+    }
+
+    [Fact]
+    public void ResultT_ImplicitFromNullError_ShouldThrow()
+    {
+        Assert.Throws<ArgumentNullException>(() =>
+        {
+            Error? nullError = null;
+            Result<int> _ = nullError!;
+        });
+    }
+
+    [Fact]
+    public void ResultT_ImplicitFromNullList_ShouldThrow()
+    {
+        Assert.Throws<ArgumentNullException>(() =>
+        {
+            List<Error>? nullList = null;
+            Result<int> _ = nullList!;
+        });
+    }
+}

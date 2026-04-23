@@ -3,6 +3,7 @@
 A modern, **immutable** Result pattern library for **.NET 10**.
 
 - Zero-allocation success path — `Result` and `Result<TValue>` are `readonly struct`
+- Immutable and thread-safe — `Result`, `Result<TValue>`, and `Error` can be freely shared across threads
 - Immutable errors with machine-readable codes, metadata, and causal chains
 - Functional combinators — `Map`, `Bind`, `Match`, `Tap`, `Ensure`, `Switch`
 - First-class async — every combinator has an async overload + fluent `Task<Result<T>>` extensions

@@ -6,6 +6,7 @@ namespace Resultify;
 /// <summary>
 /// Represents the outcome of an operation that returns a value of type <typeparamref name="TValue"/>.
 /// Value type — zero-allocation on the success path when <typeparamref name="TValue"/> is a value type.
+/// Instances are immutable and safe to share across threads.
 /// </summary>
 public readonly struct Result<TValue> : IEquatable<Result<TValue>>
 {
@@ -328,10 +329,21 @@ public readonly struct Result<TValue> : IEquatable<Result<TValue>>
     public static implicit operator Result<TValue>(TValue? value) => Create(value);
 
     /// <summary>Implicitly convert a single Error to a failed Result.</summary>
-    public static implicit operator Result<TValue>(Error error) => Failure(error);
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="error"/> is null.</exception>
+    public static implicit operator Result<TValue>(Error error)
+    {
+        ArgumentNullException.ThrowIfNull(error);
+        return Failure(error);
+    }
 
     /// <summary>Implicitly convert a list of Errors to a failed Result.</summary>
-    public static implicit operator Result<TValue>(List<Error> errors) => Failure(errors);
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="errors"/> is null.</exception>
+    /// <exception cref="ArgumentException">Thrown when <paramref name="errors"/> is empty.</exception>
+    public static implicit operator Result<TValue>(List<Error> errors)
+    {
+        ArgumentNullException.ThrowIfNull(errors);
+        return Failure(errors);
+    }
 
     // ── Equality ─────────────────────────────────────────────
 
