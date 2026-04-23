@@ -176,15 +176,21 @@ var result = GetCustomer(id)
     .TapError(errors => logger.LogWarning("Lookup failed: {Errors}", errors));
 ```
 
+`TapErrorAsync` is the async variant:
+
+```csharp
+var result = await GetCustomerAsync(id)
+    .TapErrorAsync(errors => logService.LogAsync(errors));
+```
+
 ## Async pipelines
 
 Every combinator works seamlessly with `Task<Result<T>>`:
 
 ```csharp
-Result<OrderConfirmation> result = await GetCustomerAsync(id)
-    .Map(c => c.Email)
-    .BindAsync(email => ValidateEmailAsync(email))
-    .BindAsync(email => CreateOrderAsync(email))
+Result<Order> order = await GetCustomerAsync(id)
+    .BindAsync(customer => ValidateCustomerAsync(customer))
+    .BindAsync(customer => CreateOrderAsync(customer))
     .Ensure(order => order.Total > 0, "Order total must be positive");
 ```
 
@@ -259,6 +265,8 @@ Result<string> r = "hello";           // Success (via Create)
 Result<string> r = (string?)null;     // Failure with Error.NullValue
 Result r = new Error("fail");         // Failure
 Result<int> r = new Error("fail");    // Failure
+Result r = new List<Error> { e1, e2 }; // Failure with multiple errors
+Result<int> r = new List<Error> { e1, e2 }; // Failure with multiple errors
 ```
 
 ## Clean Architecture / CQS integration
@@ -297,26 +305,36 @@ public sealed class CreateOrderHandler
 | `result.Tap(action)` | Side effect on success |
 | `result.TapAsync(func)` | Async variant of `Tap` |
 | `result.TapError(action)` | Side effect on failure |
+| `result.TapErrorAsync(func)` | Async variant of `TapError` |
 | `result.Ensure(predicate, error)` | Validation gate |
 | `result.Match(onSuccess, onFailure)` | Fold into a value |
 | `result.MatchAsync(onSuccess, onFailure)` | Async variant of `Match` |
 | `result.Switch(onSuccess, onFailure)` | Execute one of two actions |
+| `result.HasError<T>()` | Check if any error is of type `T` |
+| `result.HasError<T>(predicate)` | Check by type and predicate |
+| `result.HasErrorCode(code)` | Check by machine-readable code |
+| `result.HasException<T>()` | Check for a wrapped exception of type `T` |
 | `result.ToResult<T>(value)` | Convert to `Result<T>` |
 
 ### Result&lt;TValue&gt;
 
-All of the above, plus:
+All instance methods from `Result`, plus:
+
+> **Note:** The static factory methods (`SuccessIf`, `FailureIf`, etc.) listed in the `Result` table belong to the non-generic `Result` type. `Result<T>` has its own static factories with different signatures, as listed below. In particular, `Result<T>` has `SuccessIf` (requiring a value) but no `FailureIf`.
 
 | Method | Description |
 |--------|-------------|
 | `Result<T>.Success(value)` | Create a successful result with a value |
+| `Result<T>.Failure(error)` | Create a failed result |
 | `Result<T>.Create(value?)` | Null-safe factory |
 | `Result<T>.SuccessIf(condition, value, error)` | Conditional success with a value |
+| `Result<T>.Try(func)` | Catch exceptions as errors |
+| `Result<T>.TryAsync(func)` | Async variant of `Try` |
 | `result.Map(func)` | Transform the value |
 | `result.MapAsync(func)` | Async variant of `Map` |
 | `result.ValueOrDefault` | Value or `default(T)` |
 | `result.ToResult()` | Drop the value, keep success/failure state |
-| `result.ToResult<TNew>(converter)` | Convert to a different value type |
+| `result.ToResult<TNew>(converter)` | Convert to a different value type via a converter function |
 
 ## Design decisions
 

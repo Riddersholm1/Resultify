@@ -14,7 +14,8 @@ public sealed record ExceptionalError : Error
 
     /// <summary>
     /// Wrap an exception as an error. The code is set to <c>"Exception.{exception.GetType().Name}"</c>
-    /// and the message is copied from <see cref="Exception.Message"/>.
+    /// and the message is copied from <see cref="Exception.Message"/>. A null <see cref="Exception.Message"/>
+    /// (possible on custom exception types that override <see cref="Exception.Message"/>) is coerced to an empty string.
     /// </summary>
     /// <param name="exception">The exception to wrap. Must not be null.</param>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="exception"/> is null.</exception>

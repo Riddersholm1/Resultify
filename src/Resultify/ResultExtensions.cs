@@ -23,12 +23,16 @@ public static class ResultExtensions
             errors ??= [];
             errors.AddRange(r.Errors);
         }
-        return errors is null ? Result.Success() : Result.Failure(errors);
+        return errors is null
+            ? Result.Success()
+            : Result.Failure(errors);
     }
 
     /// <summary>
     /// Merge a collection of <see cref="Result{TValue}"/> into a single result
     /// containing all values (if all succeeded) or all errors.
+    /// Once any failure is observed, previously-collected values are discarded and
+    /// subsequent successes are ignored — only errors are aggregated.
     /// </summary>
     public static Result<IReadOnlyList<TValue>> Merge<TValue>(this IEnumerable<Result<TValue>> results)
     {
@@ -37,16 +41,21 @@ public static class ResultExtensions
 
         foreach (Result<TValue> r in results)
         {
-            if (r.IsSuccess)
-            {
-                values ??= [];
-                values.Add(r.Value);
-            }
-            else
+            if (r.IsFailure)
             {
                 errors ??= [];
                 errors.AddRange(r.Errors);
+                values = null; // drop any collected values — we're going to fail
+                continue;
             }
+
+            if (errors is not null)
+            {
+                continue; // already failing; ignore successful values
+            }
+
+            values ??= [];
+            values.Add(r.Value);
         }
 
         return errors is not null
@@ -74,12 +83,6 @@ public static class ResultExtensions
         public bool HasException<TException>() where TException : Exception =>
             result.Errors.OfType<ExceptionalError>().Any(e => e.Exception is TException);
     }
-
-    // Note: error-querying extensions for Result<TValue> are declared in the separate
-    // ResultTExtensions class below. C# 14 requires each static class to have unique
-    // extension member signatures, so HasError<TError>() cannot coexist in the same
-    // class for both Result and Result<TValue>. Consumers still call them uniformly:
-    // result.HasError<ValidationError>() works for both types.
 
     // ── Async pipeline helpers ───────────────────────────────
 

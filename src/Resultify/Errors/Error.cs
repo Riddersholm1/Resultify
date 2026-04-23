@@ -79,17 +79,22 @@ public record Error
     }
 
     /// <summary>Attach multiple metadata pairs. Returns a new instance.</summary>
-    /// <param name="metadata">The metadata pairs to attach. Must not be null.</param>
+    /// <param name="metadata">The metadata pairs to attach. Must not be null. No key or value may be null.</param>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="metadata"/> is null.</exception>
+    /// <exception cref="ArgumentException">Thrown when any key or value in <paramref name="metadata"/> is null.</exception>
     public Error WithMetadata(IEnumerable<KeyValuePair<string, object>> metadata)
     {
         ArgumentNullException.ThrowIfNull(metadata);
-        ImmutableDictionary<string, object> current = Metadata as ImmutableDictionary<string, object>
-            ?? Metadata.ToImmutableDictionary();
+        ImmutableDictionary<string, object> current = Metadata as ImmutableDictionary<string, object> ?? Metadata.ToImmutableDictionary();
         ImmutableDictionary<string, object>.Builder builder = current.ToBuilder();
         foreach (KeyValuePair<string, object> kvp in metadata)
         {
-            builder[kvp.Key] = kvp.Value;
+            if (kvp.Key is null)
+            {
+                throw new ArgumentException("Metadata keys must not be null.", nameof(metadata));
+            }
+
+            builder[kvp.Key] = kvp.Value ?? throw new ArgumentException($"Metadata value for key '{kvp.Key}' must not be null.", nameof(metadata));
         }
 
         return this with { Metadata = builder.ToImmutable() };
@@ -113,8 +118,12 @@ public record Error
     /// </summary>
     public override string ToString() =>
         string.IsNullOrEmpty(Code)
-            ? Causes.Count > 0 ? $"{Message} (caused by: {string.Join(", ", Causes)})" : Message
-            : Causes.Count > 0 ? $"[{Code}] {Message} (caused by: {string.Join(", ", Causes)})" : $"[{Code}] {Message}";
+            ? Causes.Count > 0
+                ? $"{Message} (caused by: {string.Join(", ", Causes)})"
+                : Message
+            : Causes.Count > 0
+                ? $"[{Code}] {Message} (caused by: {string.Join(", ", Causes)})"
+                : $"[{Code}] {Message}";
 
     /// <inheritdoc />
     public virtual bool Equals(Error? other)

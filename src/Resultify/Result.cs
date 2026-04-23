@@ -10,24 +10,33 @@ namespace Resultify;
 /// </summary>
 public readonly struct Result : IEquatable<Result>
 {
+    // Shared empty list so reading Errors on a successful result is allocation-free.
+    private static readonly IReadOnlyList<Error> EmptyErrors = [];
+
     private readonly IReadOnlyList<Error>? _errors;
 
     /// <summary>All errors. Empty when successful.</summary>
-    public IReadOnlyList<Error> Errors => _errors ?? [];
+    public IReadOnlyList<Error> Errors =>
+        _errors ?? EmptyErrors;
 
     /// <summary>
     /// The first error, or <see cref="Error.None"/> if successful.
     /// Use <see cref="Errors"/> when you need all of them (e.g. validation aggregation).
     /// </summary>
-    public Error FirstError => _errors is { Count: > 0 } ? _errors[0] : Error.None;
+    public Error FirstError =>
+        _errors is { Count: > 0 }
+        ? _errors[0]
+        : Error.None;
 
     /// <summary>True when the operation completed without errors.</summary>
     [MemberNotNullWhen(false, nameof(_errors))]
-    public bool IsSuccess => _errors is null or { Count: 0 };
+    public bool IsSuccess =>
+        _errors is null or { Count: 0 };
 
     /// <summary>True when the operation failed with at least one error.</summary>
     [MemberNotNullWhen(true, nameof(_errors))]
-    public bool IsFailure => !IsSuccess;
+    public bool IsFailure =>
+        !IsSuccess;
 
     private Result(IReadOnlyList<Error>? errors)
     {
@@ -37,7 +46,8 @@ public readonly struct Result : IEquatable<Result>
     // ── Factory methods ──────────────────────────────────────
 
     /// <summary>Create a successful result.</summary>
-    public static Result Success() => new(null);
+    public static Result Success() =>
+        new(null);
 
     /// <summary>Create a failed result from a single error.</summary>
     public static Result Failure(Error error)
@@ -68,10 +78,12 @@ public readonly struct Result : IEquatable<Result>
     }
 
     /// <summary>Create a successful <see cref="Result{TValue}"/> with the given value.</summary>
-    public static Result<TValue> Success<TValue>(TValue value) => Result<TValue>.Success(value);
+    public static Result<TValue> Success<TValue>(TValue value) =>
+        Result<TValue>.Success(value);
 
     /// <summary>Create a failed <see cref="Result{TValue}"/>.</summary>
-    public static Result<TValue> Failure<TValue>(Error error) => Result<TValue>.Failure(error);
+    public static Result<TValue> Failure<TValue>(Error error) =>
+        Result<TValue>.Failure(error);
 
     /// <summary>Create a failed <see cref="Result{TValue}"/>.</summary>
     public static Result<TValue> Failure<TValue>(string errorMessage) =>
@@ -82,33 +94,47 @@ public readonly struct Result : IEquatable<Result>
     /// otherwise returns a failure with <see cref="Error.NullValue"/>.
     /// </summary>
     public static Result<TValue> Create<TValue>(TValue? value) =>
-        value is not null ? Result<TValue>.Success(value) : Result<TValue>.Failure(Error.NullValue);
+        value is not null
+            ? Result<TValue>.Success(value)
+            : Result<TValue>.Failure(Error.NullValue);
 
     // ── Conditional factories ────────────────────────────────
 
     /// <summary>Returns Success if the condition is true; otherwise Failure.</summary>
     public static Result SuccessIf(bool condition, Error error) =>
-        condition ? Success() : Failure(error);
+        condition
+            ? Success()
+            : Failure(error);
 
     /// <summary>Returns Success if the condition is true; otherwise Failure.</summary>
     public static Result SuccessIf(bool condition, string errorMessage) =>
-        condition ? Success() : Failure(errorMessage);
+        condition
+            ? Success()
+            : Failure(errorMessage);
 
     /// <summary>Returns Success if the condition is true; otherwise Failure with lazy error.</summary>
     public static Result SuccessIf(bool condition, Func<Error> errorFactory) =>
-        condition ? Success() : Failure(errorFactory());
+        condition
+            ? Success()
+            : Failure(errorFactory());
 
     /// <summary>Returns Failure if the condition is true; otherwise Success.</summary>
     public static Result FailureIf(bool condition, Error error) =>
-        condition ? Failure(error) : Success();
+        condition
+            ? Failure(error)
+            : Success();
 
     /// <summary>Returns Failure if the condition is true; otherwise Success.</summary>
     public static Result FailureIf(bool condition, string errorMessage) =>
-        condition ? Failure(errorMessage) : Success();
+        condition
+            ? Failure(errorMessage)
+            : Success();
 
     /// <summary>Returns Failure if the condition is true; otherwise Success with lazy error.</summary>
     public static Result FailureIf(bool condition, Func<Error> errorFactory) =>
-        condition ? Failure(errorFactory()) : Success();
+        condition
+            ? Failure(errorFactory())
+            : Success();
 
     // ── Try ──────────────────────────────────────────────────
 
@@ -185,7 +211,9 @@ public readonly struct Result : IEquatable<Result>
             errors.AddRange(r.Errors);
         }
         // Materialize as an array so the mutable List is not exposed through the public IReadOnlyList<Error>.
-        return errors is null ? Success() : new Result(errors.ToArray());
+        return errors is null
+            ? Success()
+            : new Result(errors.ToArray());
     }
 
     // ── Combinators ──────────────────────────────────────────
@@ -195,21 +223,29 @@ public readonly struct Result : IEquatable<Result>
     /// If this result is failed, propagate the errors without executing <paramref name="bind"/>.
     /// </summary>
     public Result Bind(Func<Result> bind) =>
-        IsSuccess ? bind() : this;
+        IsSuccess
+            ? bind()
+            : this;
 
     /// <summary>Async Bind.</summary>
     public Task<Result> BindAsync(Func<Task<Result>> bind) =>
-        IsSuccess ? bind() : Task.FromResult(this);
+        IsSuccess
+            ? bind()
+            : Task.FromResult(this);
 
     /// <summary>
     /// If successful, execute <paramref name="bind"/> returning a <see cref="Result{TValue}"/>.
     /// </summary>
     public Result<TValue> Bind<TValue>(Func<Result<TValue>> bind) =>
-        IsSuccess ? bind() : Result<TValue>.Failure(Errors);
+        IsSuccess
+            ? bind()
+            : Result<TValue>.Failure(Errors);
 
     /// <summary>Async Bind to Result&lt;TValue&gt;.</summary>
     public Task<Result<TValue>> BindAsync<TValue>(Func<Task<Result<TValue>>> bind) =>
-        IsSuccess ? bind() : Task.FromResult(Result<TValue>.Failure(Errors));
+        IsSuccess
+            ? bind()
+            : Task.FromResult(Result<TValue>.Failure(Errors));
 
     /// <summary>Execute a side effect if successful. Returns this result unchanged.</summary>
     public Result Tap(Action action)
@@ -246,11 +282,19 @@ public readonly struct Result : IEquatable<Result>
 
     /// <summary>Add a validation gate. Evaluates the predicate only if currently successful.</summary>
     public Result Ensure(Func<bool> predicate, Error error) =>
-        IsFailure ? this : predicate() ? this : Failure(error);
+        IsFailure
+            ? this
+            : predicate()
+                ? this
+                : Failure(error);
 
     /// <summary>Add a validation gate with a lazy error factory.</summary>
     public Result Ensure(Func<bool> predicate, Func<Error> errorFactory) =>
-        IsFailure ? this : predicate() ? this : Failure(errorFactory());
+        IsFailure
+            ? this
+            : predicate()
+                ? this
+                : Failure(errorFactory());
 
     /// <summary>Add a validation gate with a string error message.</summary>
     public Result Ensure(Func<bool> predicate, string errorMessage) =>
@@ -260,11 +304,15 @@ public readonly struct Result : IEquatable<Result>
     /// Pattern match: execute <paramref name="onSuccess"/> or <paramref name="onFailure"/> and return the produced value.
     /// </summary>
     public TOut Match<TOut>(Func<TOut> onSuccess, Func<IReadOnlyList<Error>, TOut> onFailure) =>
-        IsSuccess ? onSuccess() : onFailure(Errors);
+        IsSuccess
+            ? onSuccess()
+            : onFailure(Errors);
 
     /// <summary>Async Match.</summary>
     public Task<TOut> MatchAsync<TOut>(Func<Task<TOut>> onSuccess, Func<IReadOnlyList<Error>, Task<TOut>> onFailure) =>
-        IsSuccess ? onSuccess() : onFailure(Errors);
+        IsSuccess
+            ? onSuccess()
+            : onFailure(Errors);
 
     /// <summary>Execute one of two actions depending on success/failure.</summary>
     public void Switch(Action onSuccess, Action<IReadOnlyList<Error>> onFailure)
@@ -283,7 +331,9 @@ public readonly struct Result : IEquatable<Result>
 
     /// <summary>Convert to a <see cref="Result{TValue}"/> by supplying a value (success) or propagating errors.</summary>
     public Result<TValue> ToResult<TValue>(TValue value) =>
-        IsSuccess ? Result<TValue>.Success(value) : Result<TValue>.Failure(Errors);
+        IsSuccess
+            ? Result<TValue>.Success(value)
+            : Result<TValue>.Failure(Errors);
 
     // ── Deconstruct ──────────────────────────────────────────
 
@@ -322,7 +372,8 @@ public readonly struct Result : IEquatable<Result>
         IsSuccess == other.IsSuccess && Errors.SequenceEqual(other.Errors);
 
     /// <inheritdoc />
-    public override bool Equals(object? obj) => obj is Result other && Equals(other);
+    public override bool Equals(object? obj) =>
+        obj is Result other && Equals(other);
 
     /// <inheritdoc />
     public override int GetHashCode()
@@ -343,10 +394,12 @@ public readonly struct Result : IEquatable<Result>
     }
 
     /// <summary>Equality operator — returns true when both results have the same success state and errors.</summary>
-    public static bool operator ==(Result left, Result right) => left.Equals(right);
+    public static bool operator ==(Result left, Result right) =>
+        left.Equals(right);
 
     /// <summary>Inequality operator — negation of <c>==</c>.</summary>
-    public static bool operator !=(Result left, Result right) => !left.Equals(right);
+    public static bool operator !=(Result left, Result right) =>
+        !left.Equals(right);
 
     /// <summary>Returns a human-readable representation of the result for logs and debugging.</summary>
     public override string ToString() =>
