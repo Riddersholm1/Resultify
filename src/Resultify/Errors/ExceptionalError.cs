@@ -1,3 +1,5 @@
+using System.Runtime.CompilerServices;
+
 namespace Resultify.Errors;
 
 /// <summary>
@@ -15,6 +17,7 @@ public sealed record ExceptionalError : Error
     /// and the message is copied from <see cref="Exception.Message"/>.
     /// </summary>
     /// <param name="exception">The exception to wrap. Must not be null.</param>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="exception"/> is null.</exception>
     public ExceptionalError(Exception exception)
         : base(BuildCode(ValidateException(exception)), exception.Message)
     {
@@ -27,6 +30,7 @@ public sealed record ExceptionalError : Error
     /// </summary>
     /// <param name="message">A human-readable description of the error.</param>
     /// <param name="exception">The exception to wrap. Must not be null.</param>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="exception"/> is null.</exception>
     public ExceptionalError(string message, Exception exception)
         : base(BuildCode(ValidateException(exception)), message)
     {
@@ -41,4 +45,16 @@ public sealed record ExceptionalError : Error
 
     private static string BuildCode(Exception exception) =>
         $"Exception.{exception.GetType().Name}";
+
+    /// <summary>
+    /// Equality includes the wrapped <see cref="Exception"/> reference. Two
+    /// <see cref="ExceptionalError"/>s are equal only when the base <see cref="Error"/> parts match
+    /// and they wrap the same exception instance.
+    /// </summary>
+    public bool Equals(ExceptionalError? other) =>
+        base.Equals(other) && ReferenceEquals(Exception, other.Exception);
+
+    /// <inheritdoc />
+    public override int GetHashCode() =>
+        HashCode.Combine(base.GetHashCode(), RuntimeHelpers.GetHashCode(Exception));
 }

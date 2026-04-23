@@ -3,13 +3,15 @@ using System.Collections.Immutable;
 namespace Resultify.Errors;
 
 /// <summary>
-/// Represents an error with a machine-readable <paramref name="Code"/> and a human-readable <paramref name="Message"/>.
+/// Represents an error with a machine-readable <see cref="Code"/> and a human-readable <see cref="Message"/>.
 /// Immutable — use <c>With*</c> methods or <c>with</c> expressions to produce new instances.
+/// Instances are safe to share across threads.
 /// </summary>
-/// <param name="Code">A stable, machine-readable identifier, e.g. <c>"User.NotFound"</c>. Useful for i18n, logs, API responses.</param>
-/// <param name="Message">A human-readable description of what went wrong.</param>
-public record Error(string Code, string Message)
+public record Error
 {
+    private readonly string _code;
+    private readonly string _message;
+
     /// <summary>The empty error — used as a sentinel when an API needs to express "no error" as a value.</summary>
     public static readonly Error None = new(string.Empty, string.Empty);
 
@@ -19,12 +21,43 @@ public record Error(string Code, string Message)
     /// <summary>A generic unknown error for use as a last-resort fallback.</summary>
     public static readonly Error Unknown = new("General.Unknown", "An unknown error occurred.");
 
+    /// <summary>A stable, machine-readable identifier, e.g. <c>"User.NotFound"</c>. Useful for i18n, logs, API responses.</summary>
+    /// <exception cref="ArgumentNullException">Thrown when set to <c>null</c> via a <c>with</c> expression.</exception>
+    public string Code
+    {
+        get => _code;
+        init => _code = value ?? throw new ArgumentNullException(nameof(value));
+    }
+
+    /// <summary>A human-readable description of what went wrong.</summary>
+    /// <exception cref="ArgumentNullException">Thrown when set to <c>null</c> via a <c>with</c> expression.</exception>
+    public string Message
+    {
+        get => _message;
+        init => _message = value ?? throw new ArgumentNullException(nameof(value));
+    }
+
+    /// <summary>Create an error with a machine-readable code and a human-readable message.</summary>
+    /// <param name="code">A stable, machine-readable identifier, e.g. <c>"User.NotFound"</c>.</param>
+    /// <param name="message">A human-readable description of what went wrong.</param>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="code"/> or <paramref name="message"/> is null.</exception>
+    public Error(string code, string message)
+    {
+        _code = code ?? throw new ArgumentNullException(nameof(code));
+        _message = message ?? throw new ArgumentNullException(nameof(message));
+    }
+
     /// <summary>Convenience constructor: create an error with just a message and an empty code.</summary>
+    /// <param name="message">A human-readable description of what went wrong.</param>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="message"/> is null.</exception>
     public Error(string message) : this(string.Empty, message) { }
 
-    // Validate positional parameters are not null.
-    private readonly string _code = Code ?? throw new ArgumentNullException(nameof(Code));
-    private readonly string _message = Message ?? throw new ArgumentNullException(nameof(Message));
+    /// <summary>Deconstruct into the machine-readable code and human-readable message.</summary>
+    public void Deconstruct(out string code, out string message)
+    {
+        code = Code;
+        message = Message;
+    }
 
     /// <summary>Structured metadata attached to this error.</summary>
     public IReadOnlyDictionary<string, object> Metadata { get; private init; } = ImmutableDictionary<string, object>.Empty;
@@ -33,16 +66,27 @@ public record Error(string Code, string Message)
     public IReadOnlyList<Error> Causes { get; private init; } = [];
 
     /// <summary>Attach a key-value metadata pair. Returns a new instance.</summary>
+    /// <param name="key">The metadata key. Must not be null.</param>
+    /// <param name="value">The metadata value. Must not be null.</param>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="key"/> or <paramref name="value"/> is null.</exception>
     public Error WithMetadata(string key, object value)
     {
-        ImmutableDictionary<string, object> builder = Metadata.ToImmutableDictionary().SetItem(key, value);
-        return this with { Metadata = builder };
+        ArgumentNullException.ThrowIfNull(key);
+        ArgumentNullException.ThrowIfNull(value);
+        ImmutableDictionary<string, object> current = Metadata as ImmutableDictionary<string, object>
+            ?? Metadata.ToImmutableDictionary();
+        return this with { Metadata = current.SetItem(key, value) };
     }
 
     /// <summary>Attach multiple metadata pairs. Returns a new instance.</summary>
+    /// <param name="metadata">The metadata pairs to attach. Must not be null.</param>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="metadata"/> is null.</exception>
     public Error WithMetadata(IEnumerable<KeyValuePair<string, object>> metadata)
     {
-        ImmutableDictionary<string, object>.Builder builder = Metadata.ToImmutableDictionary().ToBuilder();
+        ArgumentNullException.ThrowIfNull(metadata);
+        ImmutableDictionary<string, object> current = Metadata as ImmutableDictionary<string, object>
+            ?? Metadata.ToImmutableDictionary();
+        ImmutableDictionary<string, object>.Builder builder = current.ToBuilder();
         foreach (KeyValuePair<string, object> kvp in metadata)
         {
             builder[kvp.Key] = kvp.Value;

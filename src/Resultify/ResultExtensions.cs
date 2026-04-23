@@ -75,24 +75,11 @@ public static class ResultExtensions
             result.Errors.OfType<ExceptionalError>().Any(e => e.Exception is TException);
     }
 
-    extension<TValue>(Result<TValue> result)
-    {
-        /// <summary>Check if the result contains an error with the specified code.</summary>
-        public bool HasErrorCode(string code) =>
-            result.Errors.Any(e => e.Code == code);
-    }
-
-    /// <summary>Check if the result contains an error of the specified type.</summary>
-    public static bool HasError<TError, TValue>(this Result<TValue> result) where TError : Error =>
-        result.Errors.OfType<TError>().Any();
-
-    /// <summary>Check if the result contains an error of the specified type matching a predicate.</summary>
-    public static bool HasError<TError, TValue>(this Result<TValue> result, Func<TError, bool> predicate) where TError : Error =>
-        result.Errors.OfType<TError>().Any(predicate);
-
-    /// <summary>Check if any error in the result was caused by a specific exception type.</summary>
-    public static bool HasException<TException, TValue>(this Result<TValue> result) where TException : Exception =>
-        result.Errors.OfType<ExceptionalError>().Any(e => e.Exception is TException);
+    // Note: error-querying extensions for Result<TValue> are declared in the separate
+    // ResultTExtensions class below. C# 14 requires each static class to have unique
+    // extension member signatures, so HasError<TError>() cannot coexist in the same
+    // class for both Result and Result<TValue>. Consumers still call them uniformly:
+    // result.HasError<ValidationError>() works for both types.
 
     // ── Async pipeline helpers ───────────────────────────────
 
@@ -103,6 +90,13 @@ public static class ResultExtensions
         {
             Result<TValue> result = await resultTask.ConfigureAwait(false);
             return result.Map(mapper);
+        }
+
+        /// <summary>Map over an async Result pipeline with an async mapper.</summary>
+        public async Task<Result<TNew>> MapAsync<TNew>(Func<TValue, Task<TNew>> mapper)
+        {
+            Result<TValue> result = await resultTask.ConfigureAwait(false);
+            return await result.MapAsync(mapper).ConfigureAwait(false);
         }
 
         /// <summary>Bind over an async Result pipeline.</summary>
@@ -126,6 +120,13 @@ public static class ResultExtensions
             return result.Tap(action);
         }
 
+        /// <summary>Tap over an async Result pipeline with an async action.</summary>
+        public async Task<Result<TValue>> TapAsync(Func<TValue, Task> action)
+        {
+            Result<TValue> result = await resultTask.ConfigureAwait(false);
+            return await result.TapAsync(action).ConfigureAwait(false);
+        }
+
         /// <summary>Ensure over an async Result pipeline.</summary>
         public async Task<Result<TValue>> Ensure(Func<TValue, bool> predicate, Error error)
         {
@@ -138,6 +139,13 @@ public static class ResultExtensions
         {
             Result<TValue> result = await resultTask.ConfigureAwait(false);
             return result.Ensure(predicate, errorMessage);
+        }
+
+        /// <summary>Ensure over an async Result pipeline with a lazy error factory.</summary>
+        public async Task<Result<TValue>> Ensure(Func<TValue, bool> predicate, Func<TValue, Error> errorFactory)
+        {
+            Result<TValue> result = await resultTask.ConfigureAwait(false);
+            return result.Ensure(predicate, errorFactory);
         }
 
         /// <summary>Match over an async Result pipeline.</summary>
@@ -159,6 +167,18 @@ public static class ResultExtensions
         {
             Result<TValue> result = await resultTask.ConfigureAwait(false);
             return result.TapError(action);
+        }
+
+        /// <summary>TapError over an async Result pipeline with an async action.</summary>
+        public async Task<Result<TValue>> TapErrorAsync(Func<IReadOnlyList<Error>, Task> action)
+        {
+            Result<TValue> result = await resultTask.ConfigureAwait(false);
+            if (result.IsFailure)
+            {
+                await action(result.Errors).ConfigureAwait(false);
+            }
+
+            return result;
         }
 
         /// <summary>Switch over an async Result pipeline.</summary>
@@ -193,6 +213,15 @@ public static class ResultExtensions
             return result.Match(onSuccess, onFailure);
         }
 
+        /// <summary>Async Match over an async non-generic Result pipeline.</summary>
+        public async Task<TOut> MatchAsync<TOut>(
+            Func<Task<TOut>> onSuccess,
+            Func<IReadOnlyList<Error>, Task<TOut>> onFailure)
+        {
+            Result result = await resultTask.ConfigureAwait(false);
+            return await result.MatchAsync(onSuccess, onFailure).ConfigureAwait(false);
+        }
+
         /// <summary>Bind over an async non-generic Result pipeline.</summary>
         public async Task<Result> Bind(Func<Result> bind)
         {
@@ -214,6 +243,13 @@ public static class ResultExtensions
             return result.Tap(action);
         }
 
+        /// <summary>Tap over an async non-generic Result pipeline with an async action.</summary>
+        public async Task<Result> TapAsync(Func<Task> action)
+        {
+            Result result = await resultTask.ConfigureAwait(false);
+            return await result.TapAsync(action).ConfigureAwait(false);
+        }
+
         /// <summary>TapError over an async non-generic Result pipeline.</summary>
         public async Task<Result> TapError(Action<IReadOnlyList<Error>> action)
         {
@@ -221,11 +257,118 @@ public static class ResultExtensions
             return result.TapError(action);
         }
 
+        /// <summary>TapError over an async non-generic Result pipeline with an async action.</summary>
+        public async Task<Result> TapErrorAsync(Func<IReadOnlyList<Error>, Task> action)
+        {
+            Result result = await resultTask.ConfigureAwait(false);
+            if (result.IsFailure)
+            {
+                await action(result.Errors).ConfigureAwait(false);
+            }
+
+            return result;
+        }
+
+        /// <summary>Ensure over an async non-generic Result pipeline.</summary>
+        public async Task<Result> Ensure(Func<bool> predicate, Error error)
+        {
+            Result result = await resultTask.ConfigureAwait(false);
+            return result.Ensure(predicate, error);
+        }
+
+        /// <summary>Ensure over an async non-generic Result pipeline with a lazy error factory.</summary>
+        public async Task<Result> Ensure(Func<bool> predicate, Func<Error> errorFactory)
+        {
+            Result result = await resultTask.ConfigureAwait(false);
+            return result.Ensure(predicate, errorFactory);
+        }
+
         /// <summary>Switch over an async non-generic Result pipeline.</summary>
         public async Task Switch(Action onSuccess, Action<IReadOnlyList<Error>> onFailure)
         {
             Result result = await resultTask.ConfigureAwait(false);
             result.Switch(onSuccess, onFailure);
+        }
+
+        /// <summary>Check if the awaited result contains an error of the specified type.</summary>
+        public async Task<bool> HasError<TError>() where TError : Error
+        {
+            Result result = await resultTask.ConfigureAwait(false);
+            return result.Errors.OfType<TError>().Any();
+        }
+
+        /// <summary>Check if the awaited result contains an error with the specified code.</summary>
+        public async Task<bool> HasErrorCode(string code)
+        {
+            Result result = await resultTask.ConfigureAwait(false);
+            return result.Errors.Any(e => e.Code == code);
+        }
+
+        /// <summary>Check if the awaited result contains an error caused by the specified exception type.</summary>
+        public async Task<bool> HasException<TException>() where TException : Exception
+        {
+            Result result = await resultTask.ConfigureAwait(false);
+            return result.Errors.OfType<ExceptionalError>().Any(e => e.Exception is TException);
+        }
+    }
+}
+
+/// <summary>
+/// Error-querying extension methods for <see cref="Result{TValue}"/> and <see cref="Task{TResult}"/>
+/// of <see cref="Result{TValue}"/>. Lives in a separate class from <see cref="ResultExtensions"/>
+/// because C# 14 extension members require unique signatures per declaring class, and
+/// <see cref="ResultExtensions"/> already declares <c>HasError</c>/<c>HasException</c>/<c>HasErrorCode</c>
+/// on the non-generic <see cref="Result"/> receiver.
+/// </summary>
+public static class ResultTExtensions
+{
+    extension<TValue>(Result<TValue> result)
+    {
+        /// <summary>Check if the result contains an error of the specified type.</summary>
+        public bool HasError<TError>() where TError : Error =>
+            result.Errors.OfType<TError>().Any();
+
+        /// <summary>Check if the result contains an error of the specified type matching a predicate.</summary>
+        public bool HasError<TError>(Func<TError, bool> predicate) where TError : Error =>
+            result.Errors.OfType<TError>().Any(predicate);
+
+        /// <summary>Check if the result contains an error with the specified code.</summary>
+        public bool HasErrorCode(string code) =>
+            result.Errors.Any(e => e.Code == code);
+
+        /// <summary>Check if any error in the result was caused by a specific exception type.</summary>
+        public bool HasException<TException>() where TException : Exception =>
+            result.Errors.OfType<ExceptionalError>().Any(e => e.Exception is TException);
+    }
+
+    extension<TValue>(Task<Result<TValue>> resultTask)
+    {
+        /// <summary>Check if the awaited result contains an error of the specified type.</summary>
+        public async Task<bool> HasError<TError>() where TError : Error
+        {
+            Result<TValue> result = await resultTask.ConfigureAwait(false);
+            return result.Errors.OfType<TError>().Any();
+        }
+
+        /// <summary>Check if the awaited result contains an error of the specified type matching a predicate.</summary>
+        public async Task<bool> HasError<TError>(Func<TError, bool> predicate) where TError : Error
+        {
+            Result<TValue> result = await resultTask.ConfigureAwait(false);
+            return result.Errors.OfType<TError>().Any(predicate);
+        }
+
+        /// <summary>Check if the awaited result contains an error with the specified code.</summary>
+        public async Task<bool> HasErrorCode(string code)
+        {
+            Result<TValue> result = await resultTask.ConfigureAwait(false);
+            return result.Errors.Any(e => e.Code == code);
+        }
+
+        /// <summary>Check if the awaited result contains an error caused by the specified exception type.</summary>
+        public async Task<bool> HasException<TException>() where TException : Exception
+        {
+            Result<TValue> result = await resultTask.ConfigureAwait(false);
+            return result.Errors.OfType<ExceptionalError>().Any(e => e.Exception is TException);
         }
     }
 }

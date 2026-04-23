@@ -54,8 +54,12 @@ public readonly struct Result : IEquatable<Result>
         Failure(new Error(code, errorMessage));
 
     /// <summary>Create a failed result from multiple errors.</summary>
+    /// <param name="errors">The errors to include. Must be non-null and contain at least one element.</param>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="errors"/> is null.</exception>
+    /// <exception cref="ArgumentException">Thrown when <paramref name="errors"/> is empty.</exception>
     public static Result Failure(IEnumerable<Error> errors)
     {
+        ArgumentNullException.ThrowIfNull(errors);
         Error[] array = errors.ToArray();
         return array.Length == 0
             ? throw new ArgumentException("At least one error is required.", nameof(errors))
@@ -179,7 +183,8 @@ public readonly struct Result : IEquatable<Result>
             errors ??= [];
             errors.AddRange(r.Errors);
         }
-        return errors is null ? Success() : new Result(errors);
+        // Materialize as an array so the mutable List is not exposed through the public IReadOnlyList<Error>.
+        return errors is null ? Success() : new Result(errors.ToArray());
     }
 
     // ── Combinators ──────────────────────────────────────────

@@ -64,13 +64,15 @@ public readonly struct Result<TValue> : IEquatable<Result<TValue>>
 
     private Result(IReadOnlyList<Error> errors)
     {
-        ValueOrDefault = default(TValue?);
+        ValueOrDefault = default;
         _errors = errors;
     }
 
     // ── Factory methods ──────────────────────────────────────
 
     /// <summary>Create a successful result with the given value.</summary>
+    /// <param name="value">The value to wrap. Must not be null.</param>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="value"/> is null.</exception>
     public static Result<TValue> Success(TValue value)
     {
         ArgumentNullException.ThrowIfNull(value);
@@ -93,8 +95,12 @@ public readonly struct Result<TValue> : IEquatable<Result<TValue>>
         Failure(new Error(code, errorMessage));
 
     /// <summary>Create a failed result from multiple errors.</summary>
+    /// <param name="errors">The errors to include. Must be non-null and contain at least one element.</param>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="errors"/> is null.</exception>
+    /// <exception cref="ArgumentException">Thrown when <paramref name="errors"/> is empty.</exception>
     public static Result<TValue> Failure(IEnumerable<Error> errors)
     {
+        ArgumentNullException.ThrowIfNull(errors);
         Error[] array = errors.ToArray();
         return array.Length == 0
             ? throw new ArgumentException("At least one error is required.", nameof(errors))
@@ -295,6 +301,24 @@ public readonly struct Result<TValue> : IEquatable<Result<TValue>>
         errors = Errors;
     }
 
+    // ── Error querying ───────────────────────────────────────
+
+    /// <summary>Check if the result contains an error of the specified type.</summary>
+    public bool HasError<TError>() where TError : Error =>
+        Errors.OfType<TError>().Any();
+
+    /// <summary>Check if the result contains an error of the specified type matching a predicate.</summary>
+    public bool HasError<TError>(Func<TError, bool> predicate) where TError : Error =>
+        Errors.OfType<TError>().Any(predicate);
+
+    /// <summary>Check if the result contains an error with the specified code.</summary>
+    public bool HasErrorCode(string code) =>
+        Errors.Any(e => e.Code == code);
+
+    /// <summary>Check if any error in the result was caused by a specific exception type.</summary>
+    public bool HasException<TException>() where TException : Exception =>
+        Errors.OfType<ExceptionalError>().Any(e => e.Exception is TException);
+
     // ── Implicit conversions ─────────────────────────────────
 
     /// <summary>
@@ -351,6 +375,6 @@ public readonly struct Result<TValue> : IEquatable<Result<TValue>>
     /// <inheritdoc />
     public override string ToString() =>
         IsSuccess
-            ? $"Result<{typeof(TValue).Name}>: Success ({Value})"
+            ? $"Result<{typeof(TValue).Name}>: Success ({ValueOrDefault?.ToString() ?? "null"})"
             : $"Result<{typeof(TValue).Name}>: Failure ({string.Join("; ", Errors)})";
 }

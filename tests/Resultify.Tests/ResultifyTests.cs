@@ -864,8 +864,8 @@ public sealed class HasErrorOnResultTTests
     {
         Result<int> result = Result<int>.Failure(new ValidationError("Name", "Required"));
 
-        Assert.True(result.HasError<ValidationError, int>());
-        Assert.False(result.HasError<NotFoundError, int>());
+        Assert.True(result.HasError<ValidationError>());
+        Assert.False(result.HasError<NotFoundError>());
     }
 
     [Fact]
@@ -873,8 +873,8 @@ public sealed class HasErrorOnResultTTests
     {
         Result<int> result = Result<int>.Failure(new ValidationError("Email", "Invalid"));
 
-        Assert.True(result.HasError<ValidationError, int>(e => e.PropertyName == "Email"));
-        Assert.False(result.HasError<ValidationError, int>(e => e.PropertyName == "Name"));
+        Assert.True(result.HasError<ValidationError>(e => e.PropertyName == "Email"));
+        Assert.False(result.HasError<ValidationError>(e => e.PropertyName == "Name"));
     }
 
     [Fact]
@@ -891,8 +891,8 @@ public sealed class HasErrorOnResultTTests
     {
         Result<int> result = Result<int>.Try(() => throw new InvalidOperationException());
 
-        Assert.True(result.HasException<InvalidOperationException, int>());
-        Assert.False(result.HasException<ArgumentException, int>());
+        Assert.True(result.HasException<InvalidOperationException>());
+        Assert.False(result.HasException<ArgumentException>());
     }
 }
 
