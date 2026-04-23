@@ -65,7 +65,7 @@ public readonly struct Result<TValue> : IEquatable<Result<TValue>>
 
     private Result(IReadOnlyList<Error> errors)
     {
-        ValueOrDefault = default;
+        ValueOrDefault = default(TValue?);
         _errors = errors;
     }
 

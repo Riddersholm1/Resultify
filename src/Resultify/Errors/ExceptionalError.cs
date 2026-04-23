@@ -49,7 +49,7 @@ public sealed record ExceptionalError : Error
     /// <summary>
     /// Equality includes the wrapped <see cref="Exception"/> reference. Two
     /// <see cref="ExceptionalError"/>s are equal only when the base <see cref="Error"/> parts match
-    /// and they wrap the same exception instance.
+    /// , and they wrap the same exception instance.
     /// </summary>
     public bool Equals(ExceptionalError? other) =>
         base.Equals(other) && ReferenceEquals(Exception, other.Exception);

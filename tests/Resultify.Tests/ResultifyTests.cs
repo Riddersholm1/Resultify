@@ -1113,7 +1113,7 @@ public sealed class ResultTEnsureLazyFactoryTests
         var called = false;
         Result<int> result = Result<int>.Failure("earlier").Ensure(
             v => v > 0,
-            v =>
+            _ =>
             {
                 called = true;
                 return new Error("should not run");
@@ -1136,7 +1136,7 @@ public sealed class ToStringTests
     [Fact]
     public void Result_Failure_ToString_ShouldContainErrorText()
     {
-        string text = Result.Failure("code", "bad").ToString();
+        var text = Result.Failure("code", "bad").ToString();
 
         Assert.Contains("Failure", text);
         Assert.Contains("code", text);
@@ -1146,7 +1146,7 @@ public sealed class ToStringTests
     [Fact]
     public void ResultT_Success_ToString_ShouldContainValue()
     {
-        string text = Result<int>.Success(42).ToString();
+        var text = Result<int>.Success(42).ToString();
 
         Assert.Contains("Success", text);
         Assert.Contains("42", text);
@@ -1158,7 +1158,7 @@ public sealed class ToStringTests
     {
         Result<string> result = default;
 
-        string text = result.ToString();
+        var text = result.ToString();
 
         Assert.Contains("Success", text);
         Assert.Contains("null", text);
@@ -1167,7 +1167,7 @@ public sealed class ToStringTests
     [Fact]
     public void ResultT_Failure_ToString_ShouldContainErrors()
     {
-        string text = Result<int>.Failure("boom").ToString();
+        var text = Result<int>.Failure("boom").ToString();
 
         Assert.Contains("Failure", text);
         Assert.Contains("boom", text);
@@ -1178,7 +1178,7 @@ public sealed class ToStringTests
     {
         Error err = new Error("Top.Code", "top").CausedBy(new Error("root"));
 
-        string text = err.ToString();
+        var text = err.ToString();
 
         Assert.Contains("Top.Code", text);
         Assert.Contains("top", text);
@@ -1195,8 +1195,8 @@ public sealed class ErrorSubtypeEqualityTests
         var notFound = new NotFoundError("Customer", 42);
         var plain = new Error(notFound.Code, notFound.Message);
 
-        Assert.NotEqual<Error>(notFound, plain);
-        Assert.NotEqual<Error>(plain, notFound);
+        Assert.NotEqual(notFound, plain);
+        Assert.NotEqual(plain, notFound);
     }
 
     [Fact]
@@ -1205,7 +1205,7 @@ public sealed class ErrorSubtypeEqualityTests
         var vErr = new ValidationError("Email", "Required");
         var plain = new Error(vErr.Code, vErr.Message);
 
-        Assert.NotEqual<Error>(vErr, plain);
+        Assert.NotEqual(vErr, plain);
     }
 
     [Fact]
