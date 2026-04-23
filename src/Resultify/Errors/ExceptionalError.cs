@@ -20,7 +20,7 @@ public sealed record ExceptionalError : Error
     /// <param name="exception">The exception to wrap. Must not be null.</param>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="exception"/> is null.</exception>
     public ExceptionalError(Exception exception)
-        : base(BuildCode(ValidateException(exception)), exception.Message)
+        : base(BuildCode(ValidateException(exception)), exception.Message ?? string.Empty)
     {
         Exception = exception;
     }
