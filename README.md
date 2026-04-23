@@ -176,21 +176,15 @@ var result = GetCustomer(id)
     .TapError(errors => logger.LogWarning("Lookup failed: {Errors}", errors));
 ```
 
-`TapErrorAsync` is the async variant:
-
-```csharp
-var result = await GetCustomerAsync(id)
-    .TapErrorAsync(errors => logService.LogAsync(errors));
-```
-
 ## Async pipelines
 
 Every combinator works seamlessly with `Task<Result<T>>`:
 
 ```csharp
-Result<Order> order = await GetCustomerAsync(id)
-    .BindAsync(customer => ValidateCustomerAsync(customer))
-    .BindAsync(customer => CreateOrderAsync(customer))
+Result<OrderConfirmation> result = await GetCustomerAsync(id)
+    .Map(c => c.Email)
+    .BindAsync(email => ValidateEmailAsync(email))
+    .BindAsync(email => CreateOrderAsync(email))
     .Ensure(order => order.Total > 0, "Order total must be positive");
 ```
 
@@ -213,6 +207,15 @@ Result<int> result = await Result<int>.TryAsync(
 
 `OperationCanceledException` and `TaskCanceledException` are never caught —
 they propagate as-is in both sync and async variants.
+
+`Result<T>.Try` and `Result<T>.TryAsync` route a `null` return value through
+`Create(...)`, so it becomes a failure with `Error.NullValue` rather than being
+surfaced as an `Exception.ArgumentNullException`:
+
+```csharp
+Result<string> result = Result<string>.Try(() => LookupName(id)); // may return null
+// If LookupName returns null: result.IsFailure && result.FirstError == Error.NullValue
+```
 
 Exceptional errors get a stable code like `Exception.InvalidOperationException`
 so you can query by exception type:
@@ -265,8 +268,6 @@ Result<string> r = "hello";           // Success (via Create)
 Result<string> r = (string?)null;     // Failure with Error.NullValue
 Result r = new Error("fail");         // Failure
 Result<int> r = new Error("fail");    // Failure
-Result r = new List<Error> { e1, e2 }; // Failure with multiple errors
-Result<int> r = new List<Error> { e1, e2 }; // Failure with multiple errors
 ```
 
 ## Clean Architecture / CQS integration
@@ -290,51 +291,51 @@ public sealed class CreateOrderHandler
 
 ### Result (non-generic)
 
-| Method | Description |
+| Member | Description |
 |--------|-------------|
+| `result.IsSuccess` / `result.IsFailure` | Success/failure state |
+| `result.Errors` | All errors. Empty (shared instance) when successful — no allocation |
+| `result.FirstError` | The first error, or `Error.None` if successful |
 | `Result.Success()` | Create a successful result |
-| `Result.Failure(error)` | Create a failed result |
-| `Result.SuccessIf(condition, error)` | Conditional success |
-| `Result.FailureIf(condition, error)` | Conditional failure |
-| `Result.Try(action)` | Catch exceptions as errors |
+| `Result.Failure(error)` | Create a failed result (also accepts `string`, `code+message`, or `IEnumerable<Error>`) |
+| `Result.SuccessIf(condition, error)` | Conditional success (also accepts a `Func<Error>` factory) |
+| `Result.FailureIf(condition, error)` | Conditional failure (also accepts a `Func<Error>` factory) |
+| `Result.Try(action)` / `Result.Try(func)` | Catch exceptions as errors |
 | `Result.TryAsync(func)` | Async variant of `Try` |
 | `Result.Merge(...)` | Combine multiple results |
-| `result.FirstError` | The first error, or `Error.None` if successful |
-| `result.Bind(func)` | Chain to another `Result` |
+| `result.Bind(func)` | Chain to another `Result` (or to `Result<T>`) |
 | `result.BindAsync(func)` | Async variant of `Bind` |
 | `result.Tap(action)` | Side effect on success |
 | `result.TapAsync(func)` | Async variant of `Tap` |
 | `result.TapError(action)` | Side effect on failure |
-| `result.TapErrorAsync(func)` | Async variant of `TapError` |
-| `result.Ensure(predicate, error)` | Validation gate |
+| `result.Ensure(predicate, error)` | Validation gate (also accepts `string` or `Func<Error>`) |
 | `result.Match(onSuccess, onFailure)` | Fold into a value |
 | `result.MatchAsync(onSuccess, onFailure)` | Async variant of `Match` |
 | `result.Switch(onSuccess, onFailure)` | Execute one of two actions |
-| `result.HasError<T>()` | Check if any error is of type `T` |
-| `result.HasError<T>(predicate)` | Check by type and predicate |
-| `result.HasErrorCode(code)` | Check by machine-readable code |
-| `result.HasException<T>()` | Check for a wrapped exception of type `T` |
 | `result.ToResult<T>(value)` | Convert to `Result<T>` |
+| `result.Deconstruct(out isSuccess, out errors)` | Tuple deconstruction |
 
 ### Result&lt;TValue&gt;
 
-All instance methods from `Result`, plus:
+All of the above, plus:
 
-> **Note:** The static factory methods (`SuccessIf`, `FailureIf`, etc.) listed in the `Result` table belong to the non-generic `Result` type. `Result<T>` has its own static factories with different signatures, as listed below. In particular, `Result<T>` has `SuccessIf` (requiring a value) but no `FailureIf`.
-
-| Method | Description |
+| Member | Description |
 |--------|-------------|
-| `Result<T>.Success(value)` | Create a successful result with a value |
-| `Result<T>.Failure(error)` | Create a failed result |
-| `Result<T>.Create(value?)` | Null-safe factory |
+| `result.Value` | The value. Throws `InvalidOperationException` on failure or null value |
+| `result.ValueOrDefault` | Value or `default(T)` — safe for null checks |
+| `Result<T>.Success(value)` | Create a successful result with a value (rejects `null`) |
+| `Result<T>.Create(value?)` | Null-safe factory — `null` becomes `Error.NullValue` |
 | `Result<T>.SuccessIf(condition, value, error)` | Conditional success with a value |
-| `Result<T>.Try(func)` | Catch exceptions as errors |
-| `Result<T>.TryAsync(func)` | Async variant of `Try` |
+| `Result<T>.Try(func)` | Catch exceptions as errors. `null` returns become `Error.NullValue` |
+| `Result<T>.TryAsync(func)` | Async variant of `Try`. `null` returns become `Error.NullValue` |
 | `result.Map(func)` | Transform the value |
 | `result.MapAsync(func)` | Async variant of `Map` |
-| `result.ValueOrDefault` | Value or `default(T)` |
 | `result.ToResult()` | Drop the value, keep success/failure state |
-| `result.ToResult<TNew>(converter)` | Convert to a different value type via a converter function |
+| `result.ToResult<TNew>(converter)` | Convert to a different value type |
+| `result.HasError<T>()` / `HasError<T>(predicate)` | Query by error type |
+| `result.HasErrorCode(code)` | Query by stable error code |
+| `result.HasException<TEx>()` | Query by wrapped exception type |
+| `result.Deconstruct(out isSuccess, out value, out errors)` | Tuple deconstruction |
 
 ## Design decisions
 
@@ -348,6 +349,7 @@ All instance methods from `Result`, plus:
 | `Create<T>(T?)` with null-handling | Ergonomic implicit conversion that defends against null references |
 | `Success(value)` rejects null | Prevents creating a "successful" result that throws on `.Value` access |
 | `Try` re-throws `OperationCanceledException` | Cancellation should propagate, not become an error |
+| `Result<T>.Try(func)` maps `null` to `Error.NullValue` | Matches `Create(null)`; avoids surfacing an internal null-guard as `Exception.ArgumentNullException` |
 | No global static configuration | Thread-safe by default; no hidden coupling |
 | No `IError` / `IReason` interfaces | `record` inheritance covers extensibility without interface ceremony |
 | No `Success` reason objects | YAGNI for most codebases; success is the absence of errors |
