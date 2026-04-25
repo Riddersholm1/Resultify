@@ -206,7 +206,19 @@ Result<int> result = await Result<int>.TryAsync(
 ```
 
 `OperationCanceledException` and `TaskCanceledException` are never caught —
-they propagate as-is in both sync and async variants.
+they propagate as-is in **both sync and async** variants:
+
+```csharp
+// Sync — OperationCanceledException flows through Try unchanged
+Result.Try(() => throw new OperationCanceledException()); // throws — does NOT become a Result
+
+// Async — same behaviour
+await Result.TryAsync(() => Task.FromCanceled(token));    // throws TaskCanceledException
+```
+
+This means `Try` is safe to use inside `using var cts = new CancellationTokenSource()`
+patterns: cancellation always reaches your outer handler instead of being silently
+converted into a failure result.
 
 `Result<T>.Try` and `Result<T>.TryAsync` route a `null` return value through
 `Create(...)`, so it becomes a failure with `Error.NullValue` rather than being
@@ -232,10 +244,10 @@ Combine multiple results:
 // Non-generic — combines errors
 Result merged = Result.Merge(result1, result2, result3);
 
-// Extension on collection
+// Extension on collection (non-generic)
 Result merged = results.Merge();
 
-// Generic — either all values or all errors
+// Extension on collection (typed) — either all values or all errors
 Result<IReadOnlyList<int>> merged = new[]
 {
     Result<int>.Success(1),
@@ -244,6 +256,9 @@ Result<IReadOnlyList<int>> merged = new[]
 }.Merge();
 // merged.Value == [1, 2, 3]
 ```
+
+When any element fails, the typed `Merge` discards collected values and returns a
+failure aggregating every observed error in input order.
 
 ## Error querying
 
@@ -269,6 +284,25 @@ Result<string> r = (string?)null;     // Failure with Error.NullValue
 Result r = new Error("fail");         // Failure
 Result<int> r = new Error("fail");    // Failure
 ```
+
+## Thread safety
+
+`Result`, `Result<TValue>`, `Error`, and every built-in error subtype
+(`ValidationError`, `NotFoundError`, `ConflictError`, `ForbiddenError`,
+`ExceptionalError`) are **immutable**. Instances can be shared across threads
+without any synchronization:
+
+- `Result` / `Result<T>` are `readonly struct` — fields can never change after construction.
+- `Error.Code`, `Error.Message`, `Error.Metadata`, and `Error.Causes` are init-only.
+  `WithMetadata` / `CausedBy` return *new* instances rather than mutating.
+- The internal `Errors` list is materialized as an `Error[]` via a defensive copy in
+  `Result.Failure(IEnumerable<Error>)`, so external mutation of the source collection
+  never bleeds into the result.
+- Successful results share a single empty `IReadOnlyList<Error>` instance — reading
+  `.Errors` on a success never allocates and is safe under concurrent readers.
+
+The library declares no static, mutable state and no global configuration, so there
+are no hidden hazards when used in highly parallel handlers.
 
 ## Clean Architecture / CQS integration
 
@@ -308,12 +342,14 @@ public sealed class CreateOrderHandler
 | `result.Tap(action)` | Side effect on success |
 | `result.TapAsync(func)` | Async variant of `Tap` |
 | `result.TapError(action)` | Side effect on failure |
+| `result.TapErrorAsync(func)` | Async variant of `TapError` |
 | `result.Ensure(predicate, error)` | Validation gate (also accepts `string` or `Func<Error>`) |
 | `result.Match(onSuccess, onFailure)` | Fold into a value |
 | `result.MatchAsync(onSuccess, onFailure)` | Async variant of `Match` |
 | `result.Switch(onSuccess, onFailure)` | Execute one of two actions |
 | `result.ToResult<T>(value)` | Convert to `Result<T>` |
 | `result.Deconstruct(out isSuccess, out errors)` | Tuple deconstruction |
+| `default(Result)` | Equivalent to `Result.Success()` — IsSuccess is true, errors empty |
 
 ### Result&lt;TValue&gt;
 
@@ -321,21 +357,26 @@ All of the above, plus:
 
 | Member | Description |
 |--------|-------------|
-| `result.Value` | The value. Throws `InvalidOperationException` on failure or null value |
+| `result.Value` | The value. Throws `InvalidOperationException` on failure, on `null` value, or on `default(Result<T>)` for reference-type `T` |
 | `result.ValueOrDefault` | Value or `default(T)` — safe for null checks |
+| `result.TryGetValue(out T value)` | Exception-free access — returns `true` when success and value is non-null |
 | `Result<T>.Success(value)` | Create a successful result with a value (rejects `null`) |
 | `Result<T>.Create(value?)` | Null-safe factory — `null` becomes `Error.NullValue` |
 | `Result<T>.SuccessIf(condition, value, error)` | Conditional success with a value |
 | `Result<T>.Try(func)` | Catch exceptions as errors. `null` returns become `Error.NullValue` |
 | `Result<T>.TryAsync(func)` | Async variant of `Try`. `null` returns become `Error.NullValue` |
-| `result.Map(func)` | Transform the value |
-| `result.MapAsync(func)` | Async variant of `Map` |
+| `result.Map(func)` | Transform the value. `null` mapped values become `Error.NullValue` |
+| `result.MapAsync(func)` | Async variant of `Map`. `null` mapped values become `Error.NullValue` |
 | `result.ToResult()` | Drop the value, keep success/failure state |
-| `result.ToResult<TNew>(converter)` | Convert to a different value type |
+| `result.ToResult<TNew>(converter)` | Convert to a different value type. `null` converted values become `Error.NullValue` |
+| `result.TapErrorAsync(func)` | Async variant of `TapError` |
 | `result.HasError<T>()` / `HasError<T>(predicate)` | Query by error type |
 | `result.HasErrorCode(code)` | Query by stable error code |
 | `result.HasException<TEx>()` | Query by wrapped exception type |
 | `result.Deconstruct(out isSuccess, out value, out errors)` | Tuple deconstruction |
+| `default(Result<T>)` | ⚠️ `IsSuccess` is `true` but `.Value` throws for reference-type `T`. Prefer factories or use `TryGetValue` |
+| `Task<Result>.Bind<T>(...)` / `BindAsync<T>(...)` | Pivot from a non-generic async pipeline into a typed one without an extra `await` |
+| `IEnumerable<Result<T>>.Merge()` | Combine many typed results — all values, or all errors |
 
 ## Design decisions
 
@@ -366,7 +407,9 @@ Because `Result<T>` is a `readonly struct`, the runtime can produce
 and `ValueOrDefault = null`, but accessing `.Value` throws
 `InvalidOperationException`. This is inherent to value types in .NET —
 prefer the factory methods (`Success`, `Failure`, `Create`) and avoid
-`default`.
+`default`. If you must defend against it on the read side, use
+`TryGetValue(out T value)` — it returns `false` for both failures and
+`default(Result<T>)` with a null value, so the happy path is exception-free.
 
 **Why no `IResult` interface?**
 An interface would box the struct, defeating the zero-allocation goal.

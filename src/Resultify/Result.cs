@@ -20,7 +20,12 @@ public readonly struct Result : IEquatable<Result>
         _errors ?? EmptyErrors;
 
     /// <summary>
-    /// The first error, or <see cref="Error.None"/> if successful.
+    /// The first error when <see cref="IsFailure"/>; otherwise the sentinel <see cref="Error.None"/>.
+    /// <para>
+    /// ⚠️ Only meaningful when <see cref="IsFailure"/> is true. On a successful result this returns
+    /// <see cref="Error.None"/>, so <c>result.FirstError == someError</c> without a failure check can
+    /// match the sentinel unintentionally. Prefer <c>if (result.IsFailure) { ... result.FirstError ... }</c>.
+    /// </para>
     /// Use <see cref="Errors"/> when you need all of them (e.g. validation aggregation).
     /// </summary>
     public Error FirstError =>
@@ -65,16 +70,27 @@ public readonly struct Result : IEquatable<Result>
         Failure(new Error(code, errorMessage));
 
     /// <summary>Create a failed result from multiple errors.</summary>
-    /// <param name="errors">The errors to include. Must be non-null and contain at least one element.</param>
+    /// <param name="errors">The errors to include. Must be non-null, contain at least one element, and no null elements.</param>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="errors"/> is null.</exception>
-    /// <exception cref="ArgumentException">Thrown when <paramref name="errors"/> is empty.</exception>
+    /// <exception cref="ArgumentException">Thrown when <paramref name="errors"/> is empty or contains null elements.</exception>
     public static Result Failure(IEnumerable<Error> errors)
     {
         ArgumentNullException.ThrowIfNull(errors);
         Error[] array = errors.ToArray();
-        return array.Length == 0
-            ? throw new ArgumentException("At least one error is required.", nameof(errors))
-            : new Result(array);
+        if (array.Length == 0)
+        {
+            throw new ArgumentException("At least one error is required.", nameof(errors));
+        }
+
+        foreach (Error e in array)
+        {
+            if (e is null)
+            {
+                throw new ArgumentException("Error elements must not be null.", nameof(errors));
+            }
+        }
+
+        return new Result(array);
     }
 
     /// <summary>Create a successful <see cref="Result{TValue}"/> with the given value.</summary>
@@ -280,25 +296,50 @@ public readonly struct Result : IEquatable<Result>
         return this;
     }
 
+    /// <summary>Async TapError.</summary>
+    public async Task<Result> TapErrorAsync(Func<IReadOnlyList<Error>, Task> action)
+    {
+        if (IsFailure)
+        {
+            await action(Errors).ConfigureAwait(false);
+        }
+
+        return this;
+    }
+
     /// <summary>Add a validation gate. Evaluates the predicate only if currently successful.</summary>
-    public Result Ensure(Func<bool> predicate, Error error) =>
-        IsFailure
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="predicate"/> or <paramref name="error"/> is null.</exception>
+    public Result Ensure(Func<bool> predicate, Error error)
+    {
+        ArgumentNullException.ThrowIfNull(predicate);
+        ArgumentNullException.ThrowIfNull(error);
+        return IsFailure
             ? this
             : predicate()
                 ? this
                 : Failure(error);
+    }
 
     /// <summary>Add a validation gate with a lazy error factory.</summary>
-    public Result Ensure(Func<bool> predicate, Func<Error> errorFactory) =>
-        IsFailure
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="predicate"/> or <paramref name="errorFactory"/> is null.</exception>
+    public Result Ensure(Func<bool> predicate, Func<Error> errorFactory)
+    {
+        ArgumentNullException.ThrowIfNull(predicate);
+        ArgumentNullException.ThrowIfNull(errorFactory);
+        return IsFailure
             ? this
             : predicate()
                 ? this
                 : Failure(errorFactory());
+    }
 
     /// <summary>Add a validation gate with a string error message.</summary>
-    public Result Ensure(Func<bool> predicate, string errorMessage) =>
-        Ensure(predicate, new Error(errorMessage));
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="predicate"/> or <paramref name="errorMessage"/> is null.</exception>
+    public Result Ensure(Func<bool> predicate, string errorMessage)
+    {
+        ArgumentNullException.ThrowIfNull(errorMessage);
+        return Ensure(predicate, new Error(errorMessage));
+    }
 
     /// <summary>
     /// Pattern match: execute <paramref name="onSuccess"/> or <paramref name="onFailure"/> and return the produced value.

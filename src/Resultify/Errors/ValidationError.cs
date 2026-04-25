@@ -22,4 +22,16 @@ public sealed record ValidationError : Error
     {
         PropertyName = propertyName;
     }
+
+    /// <summary>
+    /// Create a validation error scoped to a specific property with a default message.
+    /// Useful when the property name alone is enough context and a generic message is acceptable.
+    /// </summary>
+    /// <param name="propertyName">The name of the property that failed validation. Must not be null.</param>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="propertyName"/> is null.</exception>
+    public static ValidationError ForProperty(string propertyName)
+    {
+        ArgumentNullException.ThrowIfNull(propertyName);
+        return new ValidationError(propertyName, $"'{propertyName}' is invalid.");
+    }
 }

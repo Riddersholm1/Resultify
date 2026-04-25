@@ -71,3 +71,75 @@ public sealed class WithMetadataValidationTests
         Assert.Equal(42, updated.Metadata["k2"]);
     }
 }
+
+public sealed class CausedByNullGuardTests
+{
+    [Fact]
+    public void CausedBy_NullError_ShouldThrow()
+    {
+        var error = new Error("code", "msg");
+        Error? nullCause = null;
+
+        Assert.Throws<ArgumentNullException>(() => error.CausedBy(nullCause!));
+    }
+
+    [Fact]
+    public void CausedBy_NullEnumerable_ShouldThrow()
+    {
+        var error = new Error("code", "msg");
+        IEnumerable<Error>? nullCauses = null;
+
+        Assert.Throws<ArgumentNullException>(() => error.CausedBy(nullCauses!));
+    }
+
+    [Fact]
+    public void CausedBy_EnumerableWithNullElement_ShouldThrow()
+    {
+        var error = new Error("code", "msg");
+        IEnumerable<Error> causes = [new("c1"), null!, new("c3")];
+
+        var ex = Assert.Throws<ArgumentException>(() => error.CausedBy(causes));
+        Assert.Equal("causes", ex.ParamName);
+    }
+
+    [Fact]
+    public void CausedBy_NullException_ShouldThrow()
+    {
+        var error = new Error("code", "msg");
+        Exception? nullEx = null;
+
+        Assert.Throws<ArgumentNullException>(() => error.CausedBy(nullEx!));
+    }
+
+    [Fact]
+    public void CausedBy_ValidCauses_ShouldAppendAll()
+    {
+        Error error = new Error("top")
+            .CausedBy([new Error("c1"), new Error("c2")]);
+
+        Assert.Equal(2, error.Causes.Count);
+        Assert.Equal("c1", error.Causes[0].Message);
+        Assert.Equal("c2", error.Causes[1].Message);
+    }
+}
+
+public sealed class FailureNullElementTests
+{
+    [Fact]
+    public void Result_Failure_WithNullErrorElement_ShouldThrow()
+    {
+        IEnumerable<Error> errors = [new("ok"), null!];
+
+        var ex = Assert.Throws<ArgumentException>(() => Result.Failure(errors));
+        Assert.Equal("errors", ex.ParamName);
+    }
+
+    [Fact]
+    public void ResultT_Failure_WithNullErrorElement_ShouldThrow()
+    {
+        IEnumerable<Error> errors = [new("ok"), null!];
+
+        var ex = Assert.Throws<ArgumentException>(() => Result<int>.Failure(errors));
+        Assert.Equal("errors", ex.ParamName);
+    }
+}

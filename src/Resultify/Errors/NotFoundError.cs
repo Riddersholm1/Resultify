@@ -29,4 +29,9 @@ public sealed record NotFoundError : Error
         EntityName = entityName;
         EntityId = entityId;
     }
+
+    /// <summary>Create a not-found error with an explicit code and message.</summary>
+    /// <param name="code">A stable, machine-readable identifier.</param>
+    /// <param name="message">A human-readable description of what was not found.</param>
+    public NotFoundError(string code, string message) : base(code, message) { }
 }

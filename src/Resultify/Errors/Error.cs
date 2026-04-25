@@ -11,6 +11,8 @@ public record Error
 {
     private readonly string _code;
     private readonly string _message;
+    private readonly IReadOnlyDictionary<string, object> _metadata = ImmutableDictionary<string, object>.Empty;
+    private readonly IReadOnlyList<Error> _causes = [];
 
     /// <summary>The empty error — used as a sentinel when an API needs to express "no error" as a value.</summary>
     public static readonly Error None = new(string.Empty, string.Empty);
@@ -26,7 +28,11 @@ public record Error
     public string Code
     {
         get => _code;
-        init => _code = value ?? throw new ArgumentNullException(nameof(value));
+        init
+        {
+            ArgumentNullException.ThrowIfNull(value);
+            _code = value;
+        }
     }
 
     /// <summary>A human-readable description of what went wrong.</summary>
@@ -34,7 +40,35 @@ public record Error
     public string Message
     {
         get => _message;
-        init => _message = value ?? throw new ArgumentNullException(nameof(value));
+        init
+        {
+            ArgumentNullException.ThrowIfNull(value);
+            _message = value;
+        }
+    }
+
+    /// <summary>Structured metadata attached to this error.</summary>
+    /// <exception cref="ArgumentNullException">Thrown when set to <c>null</c> via a <c>with</c> expression.</exception>
+    public IReadOnlyDictionary<string, object> Metadata
+    {
+        get => _metadata;
+        private init
+        {
+            ArgumentNullException.ThrowIfNull(value);
+            _metadata = value;
+        }
+    }
+
+    /// <summary>Causal chain of errors or exceptions that led to this error.</summary>
+    /// <exception cref="ArgumentNullException">Thrown when set to <c>null</c> via a <c>with</c> expression.</exception>
+    public IReadOnlyList<Error> Causes
+    {
+        get => _causes;
+        private init
+        {
+            ArgumentNullException.ThrowIfNull(value);
+            _causes = value;
+        }
     }
 
     /// <summary>Create an error with a machine-readable code and a human-readable message.</summary>
@@ -43,8 +77,10 @@ public record Error
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="code"/> or <paramref name="message"/> is null.</exception>
     public Error(string code, string message)
     {
-        _code = code ?? throw new ArgumentNullException(nameof(code));
-        _message = message ?? throw new ArgumentNullException(nameof(message));
+        ArgumentNullException.ThrowIfNull(code);
+        ArgumentNullException.ThrowIfNull(message);
+        _code = code;
+        _message = message;
     }
 
     /// <summary>Convenience constructor: create an error with just a message and an empty code.</summary>
@@ -58,12 +94,6 @@ public record Error
         code = Code;
         message = Message;
     }
-
-    /// <summary>Structured metadata attached to this error.</summary>
-    public IReadOnlyDictionary<string, object> Metadata { get; private init; } = ImmutableDictionary<string, object>.Empty;
-
-    /// <summary>Causal chain of errors or exceptions that led to this error.</summary>
-    public IReadOnlyList<Error> Causes { get; private init; } = [];
 
     /// <summary>Attach a key-value metadata pair. Returns a new instance.</summary>
     /// <param name="key">The metadata key. Must not be null.</param>
@@ -101,16 +131,41 @@ public record Error
     }
 
     /// <summary>Add a cause to the causal chain. Returns a new instance.</summary>
-    public Error CausedBy(Error cause) =>
-        this with { Causes = [.. Causes, cause] };
+    /// <param name="cause">The causing error. Must not be null.</param>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="cause"/> is null.</exception>
+    public Error CausedBy(Error cause)
+    {
+        ArgumentNullException.ThrowIfNull(cause);
+        return this with { Causes = [.. Causes, cause] };
+    }
 
     /// <summary>Add multiple causes. Returns a new instance.</summary>
-    public Error CausedBy(IEnumerable<Error> causes) =>
-        this with { Causes = [.. Causes, .. causes] };
+    /// <param name="causes">The causing errors. Must not be null and must not contain null elements.</param>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="causes"/> is null.</exception>
+    /// <exception cref="ArgumentException">Thrown when any element in <paramref name="causes"/> is null.</exception>
+    public Error CausedBy(IEnumerable<Error> causes)
+    {
+        ArgumentNullException.ThrowIfNull(causes);
+        Error[] array = causes.ToArray();
+        foreach (Error c in array)
+        {
+            if (c is null)
+            {
+                throw new ArgumentException("Cause elements must not be null.", nameof(causes));
+            }
+        }
+
+        return this with { Causes = [.. Causes, .. array] };
+    }
 
     /// <summary>Add an exception as a cause. Returns a new instance.</summary>
-    public Error CausedBy(Exception exception) =>
-        this with { Causes = [.. Causes, new ExceptionalError(exception)] };
+    /// <param name="exception">The causing exception. Must not be null.</param>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="exception"/> is null.</exception>
+    public Error CausedBy(Exception exception)
+    {
+        ArgumentNullException.ThrowIfNull(exception);
+        return this with { Causes = [.. Causes, new ExceptionalError(exception)] };
+    }
 
     /// <summary>
     /// Returns a human-readable representation of the error, including its code (when present)

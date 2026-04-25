@@ -239,6 +239,20 @@ public static class ResultExtensions
             return await result.BindAsync(bind).ConfigureAwait(false);
         }
 
+        /// <summary>Bind an async non-generic Result to a typed <see cref="Result{TValue}"/>.</summary>
+        public async Task<Result<TValue>> Bind<TValue>(Func<Result<TValue>> bind)
+        {
+            Result result = await resultTask.ConfigureAwait(false);
+            return result.Bind(bind);
+        }
+
+        /// <summary>Async bind an async non-generic Result to a typed <see cref="Result{TValue}"/>.</summary>
+        public async Task<Result<TValue>> BindAsync<TValue>(Func<Task<Result<TValue>>> bind)
+        {
+            Result result = await resultTask.ConfigureAwait(false);
+            return await result.BindAsync(bind).ConfigureAwait(false);
+        }
+
         /// <summary>Tap over an async non-generic Result pipeline.</summary>
         public async Task<Result> Tap(Action action)
         {
