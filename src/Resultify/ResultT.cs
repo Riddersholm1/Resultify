@@ -108,11 +108,10 @@ public readonly struct Result<TValue> : IEquatable<Result<TValue>>
     /// <summary>Create a successful result with the given value.</summary>
     /// <param name="value">The value to wrap. Must not be null.</param>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="value"/> is null.</exception>
-    public static Result<TValue> Success(TValue value)
-    {
-        ArgumentNullException.ThrowIfNull(value);
-        return new Result<TValue>(value);
-    }
+    public static Result<TValue> Success(TValue value) =>
+        value is null
+            ? throw new ArgumentNullException(nameof(value))
+            : new Result<TValue>(value);
 
     /// <summary>Create a failed result from a single error.</summary>
     public static Result<TValue> Failure(Error error)
@@ -136,22 +135,31 @@ public readonly struct Result<TValue> : IEquatable<Result<TValue>>
     public static Result<TValue> Failure(IEnumerable<Error> errors)
     {
         ArgumentNullException.ThrowIfNull(errors);
-        Error[] array = errors.ToArray();
-        if (array.Length == 0)
-        {
-            throw new ArgumentException("At least one error is required.", nameof(errors));
-        }
 
-        foreach (Error e in array)
+        // Single pass: walk the input once, validate as we go, and accumulate into a list.
+        // Fails fast on the first null element rather than after a separate full materialization.
+        List<Error> list = [];
+        foreach (Error e in errors)
         {
             if (e is null)
             {
                 throw new ArgumentException("Error elements must not be null.", nameof(errors));
             }
+
+            list.Add(e);
         }
 
-        return new Result<TValue>(array);
+        return list.Count == 0
+            ? throw new ArgumentException("At least one error is required.", nameof(errors))
+            : new Result<TValue>(list.ToArray());
     }
+
+    // Internal pass-through factory used by combinators (Map/Bind/ToResult, etc.) to forward
+    // an already-validated, immutable error list without re-running the validation+copy of
+    // the public Failure(IEnumerable<Error>) overload. Callers must guarantee the list is
+    // non-null, non-empty, contains no null elements, and will not be mutated afterwards.
+    internal static Result<TValue> FailureUnchecked(IReadOnlyList<Error> errors) =>
+        new(errors);
 
     /// <summary>
     /// Null-safe factory: returns <see cref="Success(TValue)"/> if the value is non-null,
@@ -238,7 +246,7 @@ public readonly struct Result<TValue> : IEquatable<Result<TValue>>
     public Result<TNew> Map<TNew>(Func<TValue, TNew> mapper) =>
         IsSuccess
             ? Result<TNew>.Create(mapper(Value))
-            : Result<TNew>.Failure(Errors);
+            : Result<TNew>.FailureUnchecked(Errors);
 
     /// <summary>
     /// Async Map. A <c>null</c> mapped value produces a failure with <see cref="Error.NullValue"/>.
@@ -246,31 +254,31 @@ public readonly struct Result<TValue> : IEquatable<Result<TValue>>
     public async Task<Result<TNew>> MapAsync<TNew>(Func<TValue, Task<TNew>> mapper) =>
         IsSuccess
             ? Result<TNew>.Create(await mapper(Value).ConfigureAwait(false))
-            : Result<TNew>.Failure(Errors);
+            : Result<TNew>.FailureUnchecked(Errors);
 
     /// <summary>Chain a dependent operation that also returns a Result.</summary>
     public Result<TNew> Bind<TNew>(Func<TValue, Result<TNew>> bind) =>
         IsSuccess
             ? bind(Value)
-            : Result<TNew>.Failure(Errors);
+            : Result<TNew>.FailureUnchecked(Errors);
 
     /// <summary>Async Bind.</summary>
     public Task<Result<TNew>> BindAsync<TNew>(Func<TValue, Task<Result<TNew>>> bind) =>
         IsSuccess
             ? bind(Value)
-            : Task.FromResult(Result<TNew>.Failure(Errors));
+            : Task.FromResult(Result<TNew>.FailureUnchecked(Errors));
 
     /// <summary>Bind to a non-generic Result (e.g. for void operations).</summary>
     public Result Bind(Func<TValue, Result> bind) =>
         IsSuccess
             ? bind(Value)
-            : Result.Failure(Errors);
+            : Result.FailureUnchecked(Errors);
 
     /// <summary>Async Bind to non-generic Result.</summary>
     public Task<Result> BindAsync(Func<TValue, Task<Result>> bind) =>
         IsSuccess
             ? bind(Value)
-            : Task.FromResult(Result.Failure(Errors));
+            : Task.FromResult(Result.FailureUnchecked(Errors));
 
     /// <summary>Execute a side effect if successful. Returns this result unchanged.</summary>
     public Result<TValue> Tap(Action<TValue> action)
@@ -387,7 +395,7 @@ public readonly struct Result<TValue> : IEquatable<Result<TValue>>
     public Result ToResult() =>
         IsSuccess
             ? Result.Success()
-            : Result.Failure(Errors);
+            : Result.FailureUnchecked(Errors);
 
     /// <summary>
     /// Convert to a Result with a different value type.
@@ -397,7 +405,7 @@ public readonly struct Result<TValue> : IEquatable<Result<TValue>>
     public Result<TNew> ToResult<TNew>(Func<TValue, TNew> converter) =>
         IsSuccess
             ? Result<TNew>.Create(converter(Value))
-            : Result<TNew>.Failure(Errors);
+            : Result<TNew>.FailureUnchecked(Errors);
 
     // ── Deconstruct ──────────────────────────────────────────
 

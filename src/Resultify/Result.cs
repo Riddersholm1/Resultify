@@ -76,22 +76,31 @@ public readonly struct Result : IEquatable<Result>
     public static Result Failure(IEnumerable<Error> errors)
     {
         ArgumentNullException.ThrowIfNull(errors);
-        Error[] array = errors.ToArray();
-        if (array.Length == 0)
-        {
-            throw new ArgumentException("At least one error is required.", nameof(errors));
-        }
 
-        foreach (Error e in array)
+        // Single pass: walk the input once, validate as we go, and accumulate into a list.
+        // Fails fast on the first null element rather than after a separate full materialization.
+        List<Error> list = [];
+        foreach (Error e in errors)
         {
             if (e is null)
             {
                 throw new ArgumentException("Error elements must not be null.", nameof(errors));
             }
+
+            list.Add(e);
         }
 
-        return new Result(array);
+        return list.Count == 0
+            ? throw new ArgumentException("At least one error is required.", nameof(errors))
+            : new Result(list.ToArray());
     }
+
+    // Internal pass-through factory used by combinators (Bind/ToResult, etc.) to forward
+    // an already-validated, immutable error list without re-running the validation+copy of
+    // the public Failure(IEnumerable<Error>) overload. Callers must guarantee the list is
+    // non-null, non-empty, contains no null elements, and will not be mutated afterwards.
+    internal static Result FailureUnchecked(IReadOnlyList<Error> errors) =>
+        new(errors);
 
     /// <summary>Create a successful <see cref="Result{TValue}"/> with the given value.</summary>
     public static Result<TValue> Success<TValue>(TValue value) =>
@@ -255,13 +264,13 @@ public readonly struct Result : IEquatable<Result>
     public Result<TValue> Bind<TValue>(Func<Result<TValue>> bind) =>
         IsSuccess
             ? bind()
-            : Result<TValue>.Failure(Errors);
+            : Result<TValue>.FailureUnchecked(Errors);
 
     /// <summary>Async Bind to Result&lt;TValue&gt;.</summary>
     public Task<Result<TValue>> BindAsync<TValue>(Func<Task<Result<TValue>>> bind) =>
         IsSuccess
             ? bind()
-            : Task.FromResult(Result<TValue>.Failure(Errors));
+            : Task.FromResult(Result<TValue>.FailureUnchecked(Errors));
 
     /// <summary>Execute a side effect if successful. Returns this result unchanged.</summary>
     public Result Tap(Action action)
@@ -374,7 +383,7 @@ public readonly struct Result : IEquatable<Result>
     public Result<TValue> ToResult<TValue>(TValue value) =>
         IsSuccess
             ? Result<TValue>.Success(value)
-            : Result<TValue>.Failure(Errors);
+            : Result<TValue>.FailureUnchecked(Errors);
 
     // ── Deconstruct ──────────────────────────────────────────
 

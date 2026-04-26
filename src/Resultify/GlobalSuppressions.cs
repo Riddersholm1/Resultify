@@ -32,10 +32,3 @@
     Justification = "C# 14 extension-member syntax produces compiler-generated names that trigger a false positive.",
     Scope = "type",
     Target = "~T:Resultify.ResultExtensions")]
-
-[assembly: SuppressMessage(
-    "Naming",
-    "CA1708:Identifiers should differ by more than case",
-    Justification = "C# 14 extension-member syntax produces compiler-generated names that trigger a false positive.",
-    Scope = "type",
-    Target = "~T:Resultify.ResultTExtensions")]

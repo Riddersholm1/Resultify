@@ -11,8 +11,6 @@ public record Error
 {
     private readonly string _code;
     private readonly string _message;
-    private readonly IReadOnlyDictionary<string, object> _metadata = ImmutableDictionary<string, object>.Empty;
-    private readonly IReadOnlyList<Error> _causes = [];
 
     /// <summary>The empty error — used as a sentinel when an API needs to express "no error" as a value.</summary>
     public static readonly Error None = new(string.Empty, string.Empty);
@@ -51,25 +49,25 @@ public record Error
     /// <exception cref="ArgumentNullException">Thrown when set to <c>null</c> via a <c>with</c> expression.</exception>
     public IReadOnlyDictionary<string, object> Metadata
     {
-        get => _metadata;
+        get;
         private init
         {
             ArgumentNullException.ThrowIfNull(value);
-            _metadata = value;
+            field = value;
         }
-    }
+    } = ImmutableDictionary<string, object>.Empty;
 
     /// <summary>Causal chain of errors or exceptions that led to this error.</summary>
     /// <exception cref="ArgumentNullException">Thrown when set to <c>null</c> via a <c>with</c> expression.</exception>
     public IReadOnlyList<Error> Causes
     {
-        get => _causes;
+        get;
         private init
         {
             ArgumentNullException.ThrowIfNull(value);
-            _causes = value;
+            field = value;
         }
-    }
+    } = [];
 
     /// <summary>Create an error with a machine-readable code and a human-readable message.</summary>
     /// <param name="code">A stable, machine-readable identifier, e.g. <c>"User.NotFound"</c>.</param>
@@ -146,16 +144,21 @@ public record Error
     public Error CausedBy(IEnumerable<Error> causes)
     {
         ArgumentNullException.ThrowIfNull(causes);
-        Error[] array = causes.ToArray();
-        foreach (Error c in array)
+
+        // Single pass: walk the input once, validate as we go, and accumulate alongside
+        // the existing causes. Fails fast on the first null element.
+        List<Error> combined = [.. Causes];
+        foreach (Error c in causes)
         {
             if (c is null)
             {
                 throw new ArgumentException("Cause elements must not be null.", nameof(causes));
             }
+
+            combined.Add(c);
         }
 
-        return this with { Causes = [.. Causes, .. array] };
+        return this with { Causes = combined.ToArray() };
     }
 
     /// <summary>Add an exception as a cause. Returns a new instance.</summary>

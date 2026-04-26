@@ -23,9 +23,12 @@ public static class ResultExtensions
             errors ??= [];
             errors.AddRange(r.Errors);
         }
+
+        // Errors come from already-validated failed Results, so we skip the public
+        // Failure overload's revalidation and materialize as an immutable array directly.
         return errors is null
             ? Result.Success()
-            : Result.Failure(errors);
+            : Result.FailureUnchecked(errors.ToArray());
     }
 
     /// <summary>
@@ -58,8 +61,9 @@ public static class ResultExtensions
             values.Add(r.Value);
         }
 
+        // Errors come from already-validated failed Results, so we skip revalidation.
         return errors is not null
-            ? Result<IReadOnlyList<TValue>>.Failure(errors)
+            ? Result<IReadOnlyList<TValue>>.FailureUnchecked(errors.ToArray())
             : Result<IReadOnlyList<TValue>>.Success(values?.AsReadOnly() ?? (IReadOnlyList<TValue>)[]);
     }
 
@@ -204,6 +208,34 @@ public static class ResultExtensions
             Result<TValue> result = await resultTask.ConfigureAwait(false);
             return await result.BindAsync(bind).ConfigureAwait(false);
         }
+
+        /// <summary>Check if the awaited result contains an error of the specified type.</summary>
+        public async Task<bool> HasError<TError>() where TError : Error
+        {
+            Result<TValue> result = await resultTask.ConfigureAwait(false);
+            return result.HasError<TError>();
+        }
+
+        /// <summary>Check if the awaited result contains an error of the specified type matching a predicate.</summary>
+        public async Task<bool> HasError<TError>(Func<TError, bool> predicate) where TError : Error
+        {
+            Result<TValue> result = await resultTask.ConfigureAwait(false);
+            return result.HasError(predicate);
+        }
+
+        /// <summary>Check if the awaited result contains an error with the specified code.</summary>
+        public async Task<bool> HasErrorCode(string code)
+        {
+            Result<TValue> result = await resultTask.ConfigureAwait(false);
+            return result.HasErrorCode(code);
+        }
+
+        /// <summary>Check if the awaited result contains an error caused by the specified exception type.</summary>
+        public async Task<bool> HasException<TException>() where TException : Exception
+        {
+            Result<TValue> result = await resultTask.ConfigureAwait(false);
+            return result.HasException<TException>();
+        }
     }
 
     extension(Task<Result> resultTask)
@@ -311,81 +343,21 @@ public static class ResultExtensions
         public async Task<bool> HasError<TError>() where TError : Error
         {
             Result result = await resultTask.ConfigureAwait(false);
-            return result.Errors.OfType<TError>().Any();
+            return result.HasError<TError>();
         }
 
         /// <summary>Check if the awaited result contains an error with the specified code.</summary>
         public async Task<bool> HasErrorCode(string code)
         {
             Result result = await resultTask.ConfigureAwait(false);
-            return result.Errors.Any(e => e.Code == code);
+            return result.HasErrorCode(code);
         }
 
         /// <summary>Check if the awaited result contains an error caused by the specified exception type.</summary>
         public async Task<bool> HasException<TException>() where TException : Exception
         {
             Result result = await resultTask.ConfigureAwait(false);
-            return result.Errors.OfType<ExceptionalError>().Any(e => e.Exception is TException);
-        }
-    }
-}
-
-/// <summary>
-/// Error-querying extension methods for <see cref="Result{TValue}"/> and <see cref="Task{TResult}"/>
-/// of <see cref="Result{TValue}"/>. Lives in a separate class from <see cref="ResultExtensions"/>
-/// because C# 14 extension members require unique signatures per declaring class, and
-/// <see cref="ResultExtensions"/> already declares <c>HasError</c>/<c>HasException</c>/<c>HasErrorCode</c>
-/// on the non-generic <see cref="Result"/> receiver.
-/// </summary>
-public static class ResultTExtensions
-{
-    extension<TValue>(Result<TValue> result)
-    {
-        /// <summary>Check if the result contains an error of the specified type.</summary>
-        public bool HasError<TError>() where TError : Error =>
-            result.Errors.OfType<TError>().Any();
-
-        /// <summary>Check if the result contains an error of the specified type matching a predicate.</summary>
-        public bool HasError<TError>(Func<TError, bool> predicate) where TError : Error =>
-            result.Errors.OfType<TError>().Any(predicate);
-
-        /// <summary>Check if the result contains an error with the specified code.</summary>
-        public bool HasErrorCode(string code) =>
-            result.Errors.Any(e => e.Code == code);
-
-        /// <summary>Check if any error in the result was caused by a specific exception type.</summary>
-        public bool HasException<TException>() where TException : Exception =>
-            result.Errors.OfType<ExceptionalError>().Any(e => e.Exception is TException);
-    }
-
-    extension<TValue>(Task<Result<TValue>> resultTask)
-    {
-        /// <summary>Check if the awaited result contains an error of the specified type.</summary>
-        public async Task<bool> HasError<TError>() where TError : Error
-        {
-            Result<TValue> result = await resultTask.ConfigureAwait(false);
-            return result.Errors.OfType<TError>().Any();
-        }
-
-        /// <summary>Check if the awaited result contains an error of the specified type matching a predicate.</summary>
-        public async Task<bool> HasError<TError>(Func<TError, bool> predicate) where TError : Error
-        {
-            Result<TValue> result = await resultTask.ConfigureAwait(false);
-            return result.Errors.OfType<TError>().Any(predicate);
-        }
-
-        /// <summary>Check if the awaited result contains an error with the specified code.</summary>
-        public async Task<bool> HasErrorCode(string code)
-        {
-            Result<TValue> result = await resultTask.ConfigureAwait(false);
-            return result.Errors.Any(e => e.Code == code);
-        }
-
-        /// <summary>Check if the awaited result contains an error caused by the specified exception type.</summary>
-        public async Task<bool> HasException<TException>() where TException : Exception
-        {
-            Result<TValue> result = await resultTask.ConfigureAwait(false);
-            return result.Errors.OfType<ExceptionalError>().Any(e => e.Exception is TException);
+            return result.HasException<TException>();
         }
     }
 }
