@@ -8,9 +8,6 @@ namespace Resultify.Errors;
 /// </summary>
 public record Error
 {
-    private readonly string _code;
-    private readonly string _message;
-
     /// <summary>The empty error — used as a sentinel when an API needs to express "no error" as a value.</summary>
     public static readonly Error None = new(string.Empty, string.Empty);
 
@@ -24,11 +21,11 @@ public record Error
     /// <exception cref="ArgumentNullException">Thrown when set to <c>null</c> via a <c>with</c> expression.</exception>
     public string Code
     {
-        get => _code;
+        get;
         init
         {
             ArgumentNullException.ThrowIfNull(value);
-            _code = value;
+            field = value;
         }
     }
 
@@ -36,11 +33,11 @@ public record Error
     /// <exception cref="ArgumentNullException">Thrown when set to <c>null</c> via a <c>with</c> expression.</exception>
     public string Message
     {
-        get => _message;
+        get;
         init
         {
             ArgumentNullException.ThrowIfNull(value);
-            _message = value;
+            field = value;
         }
     }
 
@@ -80,8 +77,8 @@ public record Error
     {
         ArgumentNullException.ThrowIfNull(code);
         ArgumentNullException.ThrowIfNull(message);
-        _code = code;
-        _message = message;
+        Code = code;
+        Message = message;
     }
 
     /// <summary>Convenience constructor: create an error with just a message and an empty code.</summary>
@@ -98,8 +95,8 @@ public record Error
     }
 
     /// <summary>Attach a key-value metadata pair. Returns a new instance.</summary>
-    /// <param name="key">The metadata key. Must not be null.</param>
-    /// <param name="value">The metadata value. Must not be null.</param>
+    /// <param name="key">The metadata key.</param>
+    /// <param name="value">The metadata value.</param>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="key"/> or <paramref name="value"/> is null.</exception>
     public Error WithMetadata(string key, object value)
     {
@@ -110,7 +107,7 @@ public record Error
     }
 
     /// <summary>Attach multiple metadata pairs. Returns a new instance.</summary>
-    /// <param name="metadata">The metadata pairs to attach. Must not be null. No key or value may be null.</param>
+    /// <param name="metadata">The metadata pairs to attach. No key or value may be null.</param>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="metadata"/> is null.</exception>
     /// <exception cref="ArgumentException">Thrown when any key or value in <paramref name="metadata"/> is null.</exception>
     public Error WithMetadata(IEnumerable<KeyValuePair<string, object>> metadata)
@@ -132,7 +129,7 @@ public record Error
     }
 
     /// <summary>Add a cause to the causal chain. Returns a new instance.</summary>
-    /// <param name="cause">The causing error. Must not be null.</param>
+    /// <param name="cause">The causing error.</param>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="cause"/> is null.</exception>
     public Error CausedBy(Error cause)
     {
@@ -141,7 +138,7 @@ public record Error
     }
 
     /// <summary>Add multiple causes. Returns a new instance.</summary>
-    /// <param name="causes">The causing errors. Must not be null and must not contain null elements.</param>
+    /// <param name="causes">The causing errors. Must not contain null elements.</param>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="causes"/> is null.</exception>
     /// <exception cref="ArgumentException">Thrown when any element in <paramref name="causes"/> is null.</exception>
     public Error CausedBy(IEnumerable<Error> causes)
@@ -162,7 +159,7 @@ public record Error
     }
 
     /// <summary>Add an exception as a cause. Returns a new instance.</summary>
-    /// <param name="exception">The causing exception. Must not be null.</param>
+    /// <param name="exception">The causing exception.</param>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="exception"/> is null.</exception>
     public Error CausedBy(Exception exception)
     {
@@ -222,6 +219,7 @@ public record Error
                 return false;
             }
         }
+
         return true;
     }
 
@@ -242,6 +240,7 @@ public record Error
             hash.Add(kvp.Key);
             hash.Add(kvp.Value);
         }
+
         return hash.ToHashCode();
     }
 }

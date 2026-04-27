@@ -14,31 +14,33 @@ public sealed record NotFoundError : Error
 
     /// <summary>Create a not-found error with the default code <c>"NotFound"</c>.</summary>
     /// <param name="message">A human-readable description of what was not found.</param>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="message"/> is null.</exception>
     public NotFoundError(string message)
         : base("NotFound", message) { }
 
     /// <summary>
-    /// Creates a not-found error for a specific entity and id.
-    /// The code becomes <c>"{entityName}.NotFound"</c> and the message describes the lookup.
+    /// Create a not-found error for a specific entity and id. The code becomes
+    /// <c>"{entityName}.NotFound"</c> and the message describes the lookup.
     /// </summary>
     /// <param name="entityName">The entity type name, e.g. <c>"Customer"</c>.</param>
     /// <param name="entityId">The identifier used in the lookup.</param>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="entityName"/> or <paramref name="entityId"/> is null.</exception>
     public NotFoundError(string entityName, object entityId)
-        : base($"{ValidateEntityName(entityName)}.NotFound", $"{entityName} with id '{ValidateEntityId(entityId)}' was not found.")
+        : base(BuildCode(entityName), BuildMessage(entityName, entityId))
     {
         EntityName = entityName;
         EntityId = entityId;
     }
 
-    private static string ValidateEntityName(string entityName)
+    private static string BuildCode(string entityName)
     {
         ArgumentNullException.ThrowIfNull(entityName);
-        return entityName;
+        return $"{entityName}.NotFound";
     }
 
-    private static object ValidateEntityId(object entityId)
+    private static string BuildMessage(string entityName, object entityId)
     {
         ArgumentNullException.ThrowIfNull(entityId);
-        return entityId;
+        return $"{entityName} with id '{entityId}' was not found.";
     }
 }

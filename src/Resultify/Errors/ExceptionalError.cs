@@ -13,38 +13,34 @@ public sealed record ExceptionalError : Error
     public Exception Exception { get; }
 
     /// <summary>
-    /// Wraps an exception as an error. The code is set to <c>"Exception.{exception.GetType().Name}"</c>
-    /// and the message is copied from <see cref="Exception.Message"/>.
+    /// Wraps an exception. The code becomes <c>"Exception.{exception.GetType().Name}"</c>
+    /// and the message is taken from <see cref="System.Exception.Message"/>.
     /// </summary>
-    /// <param name="exception">The exception to wrap. Must not be null.</param>
+    /// <param name="exception">The exception to wrap.</param>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="exception"/> is null.</exception>
     public ExceptionalError(Exception exception)
-        : base(BuildCode(ValidateException(exception)), exception.Message ?? string.Empty)
+        : base(BuildCode(exception), exception.Message ?? string.Empty)
     {
         Exception = exception;
     }
 
     /// <summary>
-    /// Wraps an exception as an error with a custom message.
-    /// The code is set to <c>"Exception.{exception.GetType().Name}"</c>.
+    /// Wraps an exception with a custom message. The code becomes <c>"Exception.{exception.GetType().Name}"</c>.
     /// </summary>
     /// <param name="message">A human-readable description of the error.</param>
-    /// <param name="exception">The exception to wrap. Must not be null.</param>
+    /// <param name="exception">The exception to wrap.</param>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="exception"/> is null.</exception>
     public ExceptionalError(string message, Exception exception)
-        : base(BuildCode(ValidateException(exception)), message)
+        : base(BuildCode(exception), message)
     {
         Exception = exception;
     }
 
-    private static Exception ValidateException(Exception exception)
+    private static string BuildCode(Exception exception)
     {
         ArgumentNullException.ThrowIfNull(exception);
-        return exception;
+        return $"Exception.{exception.GetType().Name}";
     }
-
-    private static string BuildCode(Exception exception) =>
-        $"Exception.{exception.GetType().Name}";
 
     /// <summary>
     /// Two <see cref="ExceptionalError"/>s are equal only when the base <see cref="Error"/> parts match,

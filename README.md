@@ -3,9 +3,9 @@
 A modern, **immutable** Result pattern library for **.NET 10**.
 
 - Zero-allocation success path — `Result` and `Result<TValue>` are `readonly struct`
-- Immutable and thread-safe — all types can be freely shared across threads
+- Immutable and thread-safe — share instances freely across threads
 - Errors with machine-readable codes, structured metadata, and causal chains
-- Functional combinators — `Map`, `Bind`, `Match`, `Tap`, `Ensure`, `Switch`
+- Functional combinators — `Map`, `Bind`, `Ensure`, `Match`, `Switch`, `Tap`, `TapError`
 - First-class async — every combinator has an async overload and fluent `Task<Result<T>>` extensions
 - Multi-error support for validation aggregation
 - AOT and trimming compatible
@@ -25,25 +25,23 @@ dotnet add package Resultify
 using Resultify;
 using Resultify.Errors;
 
-// Success
-Result<Customer> result = Result<Customer>.Success(customer);
-
-// Failure with a code + message
-Result<Customer> result = Result<Customer>.Failure("Customer.NotFound", "Customer does not exist");
+Success / failure
+Result<Customer> ok   = Result<Customer>.Success(customer);
+Result<Customer> bad  = Result<Customer>.Failure("Customer.NotFound", "Customer does not exist");
 
 // Null-safe creation — non-null becomes Success, null becomes Failure(Error.NullValue)
-Result<Customer> result = customer;                         // implicit conversion
-Result<Customer> result = Result<Customer>.Create(customer); // explicit
+Result<Customer> r1 = customer;                          // implicit conversion
+Result<Customer> r2 = Result<Customer>.Create(customer); // explicit
 
 // Conditional factories
-Result result = Result.SuccessIf(age >= 18, "Must be at least 18");
-Result result = Result.FailureIf(string.IsNullOrEmpty(name), "Name is required");
+Result a = Result.SuccessIf(age >= 18, "Must be at least 18");
+Result b = Result.FailureIf(string.IsNullOrEmpty(name), "Name is required");
 ```
 
 ## Errors
 
 Errors are immutable `record` types with a machine-readable `Code` and a
-human-readable `Message`. The code is useful for i18n, structured logs, and API responses.
+human-readable `Message`. Codes are useful for i18n, structured logs, and API responses.
 
 ```csharp
 // Full form
@@ -54,8 +52,8 @@ var error = new Error("Something went wrong");
 
 // Well-known sentinels
 Error.None        // ("", "")
-Error.NullValue   // ("General.NullValue", "...")
-Error.Unknown     // ("General.Unknown", "...")
+Error.NullValue   // ("General.NullValue", ...)
+Error.Unknown     // ("General.Unknown",  ...)
 ```
 
 ### Metadata and causes
@@ -85,14 +83,13 @@ public static class CustomerErrors
         "Customer.InvalidAge", $"Age {age} is outside the valid range.");
 }
 
-// Usage
 if (existing is not null)
     return Result<Customer>.Failure(CustomerErrors.EmailAlreadyInUse);
 ```
 
 ### Built-in error types
 
-The library ships with five subtypes that set sensible codes out of the box:
+Five subtypes ship with sensible default codes:
 
 | Type | Default Code | Use case |
 |------|-------------|----------|
@@ -128,19 +125,21 @@ public sealed record InsufficientFundsError : Error
 Result<string> name = Result<Customer>.Success(customer).Map(c => c.FullName);
 ```
 
+A `null` mapped value becomes a failure with `Error.NullValue`.
+
 ### Bind — chain dependent operations
 
 ```csharp
 Result<Order> result = GetCustomer(id)
     .Bind(customer => CreateOrder(customer))
-    .Bind(order => ValidateOrder(order));
+    .Bind(order    => ValidateOrder(order));
 ```
 
 ### Ensure — add validation gates
 
 ```csharp
 Result<int> result = Result<int>.Success(age)
-    .Ensure(a => a >= 0, "Age cannot be negative")
+    .Ensure(a => a >= 0,   "Age cannot be negative")
     .Ensure(a => a <= 150, "Age seems unrealistic");
 ```
 
@@ -148,7 +147,7 @@ Result<int> result = Result<int>.Success(age)
 
 ```csharp
 IActionResult response = result.Match(
-    onSuccess: value => Ok(value),
+    onSuccess: value  => Ok(value),
     onFailure: errors => BadRequest(errors[0].Message));
 ```
 
@@ -158,19 +157,19 @@ Like `Match` but returns `void` (or `Task` for the async overload).
 
 ```csharp
 result.Switch(
-    onSuccess: value => logger.LogInformation("Got {Value}", value),
+    onSuccess: value  => logger.LogInformation("Got {Value}", value),
     onFailure: errors => logger.LogWarning("Failed: {Errors}", errors));
 ```
 
-### Tap
+### Tap — side effect on success
 
 ```csharp
 var result = GetCustomer(id)
-    .Tap(c => logger.LogInformation("Found customer {Id}", c.Id))
+    .Tap(c  => logger.LogInformation("Found customer {Id}", c.Id))
     .Bind(c => CreateOrder(c));
 ```
 
-### TapError — side effects on failure
+### TapError — side effect on failure
 
 ```csharp
 var result = GetCustomer(id)
@@ -179,58 +178,49 @@ var result = GetCustomer(id)
 
 ## Async pipelines
 
-Every combinator works seamlessly with `Task<Result<T>>`:
+Every combinator is also an extension method on `Task<Result<T>>`, so you can
+chain sync and async steps fluently without intermediate `await`s:
 
 ```csharp
-Result<OrderConfirmation> result = await GetCustomerAsync(id)
+Result<OrderId> result = await GetCustomerAsync(id)
+    .Ensure(c => c.IsActive, CustomerErrors.Inactive)
     .Map(c => c.Email)
-    .BindAsync(email => ValidateEmailAsync(email))
     .BindAsync(email => CreateOrderAsync(email))
-    .Ensure(order => order.Total > 0, "Order total must be positive");
+    .Tap(order => logger.LogInformation("Order {Id} created", order.Id))
+    .Map(order => order.Id);
 ```
 
 ## Try — catch exceptions as errors
 
 ```csharp
-Result result = Result.Try(() => riskyOperation());
-
-Result<int> result = Result<int>.Try(() => int.Parse(input));
-
-// With custom exception handler
-Result<Data> result = Result<Data>.Try(
-    () => LoadData(),
-    ex => new Error("DataLoad.Failed", "Data load failed").CausedBy(ex));
+Result        a = Result.Try(() => riskyOperation());
+Result<int>   b = Result<int>.Try(() => int.Parse(input));
 
 // Async
-Result<int> result = await Result<int>.TryAsync(
-    () => httpClient.GetFromJsonAsync<int>(url));
+Result<int>   c = await Result<int>.TryAsync(() => httpClient.GetFromJsonAsync<int>(url));
+
+// Custom exception handler
+Result<Data>  d = Result<Data>.Try(
+    () => LoadData(),
+    ex => new Error("DataLoad.Failed", "Data load failed").CausedBy(ex));
 ```
 
-`OperationCanceledException` and `TaskCanceledException` are never caught —
-they propagate as-is in **both sync and async** variants:
-
-```csharp
-// Sync — OperationCanceledException flows through Try unchanged
-Result.Try(() => throw new OperationCanceledException()); // throws — does NOT become a Result
-
-// Async — same behaviour
-await Result.TryAsync(() => Task.FromCanceled(token));    // throws TaskCanceledException
-```
-
-This means `Try` is safe to use inside `using var cts = new CancellationTokenSource()`
-patterns: cancellation always reaches your outer handler instead of being silently
+`OperationCanceledException` and `TaskCanceledException` are **never** caught —
+they propagate as-is in both sync and async variants. This means `Try` is safe
+to use inside `using var cts = new CancellationTokenSource()` patterns:
+cancellation always reaches your outer handler instead of being silently
 converted into a failure result.
 
 `Result<T>.Try` and `Result<T>.TryAsync` route a `null` return value through
-`Create(...)`, so it becomes a failure with `Error.NullValue` rather than being
-surfaced as an `Exception.ArgumentNullException`:
+`Create(...)`, so it becomes a failure with `Error.NullValue` rather than an
+`Exception.ArgumentNullException`:
 
 ```csharp
 Result<string> result = Result<string>.Try(() => LookupName(id)); // may return null
 // If LookupName returns null: result.IsFailure && result.FirstError == Error.NullValue
 ```
 
-Exceptional errors get a stable code like `Exception.InvalidOperationException`
+Wrapped exceptions get a stable code like `Exception.InvalidOperationException`,
 so you can query by exception type:
 
 ```csharp
@@ -242,13 +232,13 @@ if (result.HasException<TimeoutException>()) { /* retry */ }
 Combine multiple results:
 
 ```csharp
-// Non-generic — accepts a params ReadOnlySpan, combines all errors
+// Non-generic — params ReadOnlySpan, combines all errors
 Result merged = Result.Merge(result1, result2, result3);
 
 // Extension on IEnumerable<Result>
 Result merged = results.Merge();
 
-// Extension on IEnumerable<Result<TValue>> — either all values or all errors
+// Extension on IEnumerable<Result<<T>> — either all values or all errors
 Result<IReadOnlyList<int>> merged = new[]
 {
     Result<int>.Success(1),
@@ -258,22 +248,23 @@ Result<IReadOnlyList<int>> merged = new[]
 // merged.Value == [1, 2, 3]
 ```
 
-When any element fails, the typed `Merge` discards collected values and returns a
-failure aggregating every observed error in input order.
+When any element fails, the typed `Merge` discards collected values and returns
+a failure aggregating every observed error in input order.
 
 ## Error querying
 
 ```csharp
-if (result.HasError<ValidationError>())              // by type
-if (result.HasError<ValidationError>(e => e.PropertyName == "Email"))  // by type + predicate
-if (result.HasErrorCode("Customer.NotFound"))         // by code
-if (result.HasException<TimeoutException>())          // wrapped exception
+
+if (result.HasError<ValidationError>())                               // by type
+if (result.HasError<ValidationError>(e => e.PropertyName == "Email")) // by type + predicate
+if (result.HasErrorCode("Customer.NotFound"))                         // by code
+if (result.HasException<TimeoutException>())                          // wrapped exception
 ```
 
 ## Deconstruction
 
 ```csharp
-var (isSuccess, errors) = Result.Failure("err");
+var (isSuccess, errors)        = Result.Failure("err");
 var (isSuccess, value, errors) = Result<int>.Success(42);
 ```
 
@@ -282,25 +273,24 @@ var (isSuccess, value, errors) = Result<int>.Success(42);
 ```csharp
 Result<string> r = "hello";           // Success (via Create)
 Result<string> r = (string?)null;     // Failure with Error.NullValue
-Result r = new Error("fail");         // Failure
-Result<int> r = new Error("fail");    // Failure
+Result         r = new Error("fail"); // Failure
+Result<int>    r = new Error("fail"); // Failure
 ```
 
 ## Thread safety
 
-`Result`, `Result<TValue>`, `Error`, and all built-in error subtypes are **immutable**.
+`Result`, `Result<T>`, `Error`, and all built-in error subtypes are **immutable**.
 Instances can be shared across threads without any synchronization:
 
 - `Result` / `Result<T>` are `readonly struct` — fields cannot change after construction.
 - `Error.Code`, `Error.Message`, `Error.Metadata`, and `Error.Causes` are init-only.
   `WithMetadata` / `CausedBy` return *new* instances rather than mutating.
-- The internal `Errors` list is stored as an `Error[]` copied from the source collection,
+- The internal `Errors` list is stored as a defensively-copied `Error[]`,
   so external mutation of the source never affects the result.
 - Successful results share a single empty `IReadOnlyList<Error>` instance — reading
   `.Errors` on a success never allocates and is safe under concurrent readers.
 
-The library declares no static, mutable state and no global configuration, so there
-are no hidden hazards when used in highly parallel handlers.
+The library declares no static, mutable state and no global configuration.
 
 ## Clean Architecture / CQS integration
 
@@ -310,11 +300,11 @@ public sealed class CreateOrderHandler
     public async Task<Result<OrderId>> Handle(CreateOrderCommand command, CancellationToken ct)
     {
         return await ValidateCommand(command)
-            .BindAsync(cmd => FindCustomer(cmd.CustomerId, ct))
-            .Ensure(customer => customer.IsActive, CustomerErrors.Inactive)
+            .BindAsync(cmd      => FindCustomer(cmd.CustomerId, ct))
+            .Ensure   (customer => customer.IsActive, CustomerErrors.Inactive)
             .BindAsync(customer => CreateOrder(customer, command, ct))
-            .Tap(order => logger.LogInformation("Order {Id} created", order.Id))
-            .Map(order => order.Id);
+            .Tap      (order    => logger.LogInformation("Order {Id} created", order.Id))
+            .Map      (order    => order.Id);
     }
 }
 ```
@@ -326,14 +316,13 @@ A class-based result allocates on every call. Structs make the success path
 zero-alloc, which matters in tight loops and high-throughput handlers.
 
 **What happens with `default(Result<string>)`?**
-Because `Result<T>` is a `readonly struct`, the runtime can produce
-`default` instances. A `default(Result<string>)` reports `IsSuccess = true`
-and `ValueOrDefault = null`, but accessing `.Value` throws
-`InvalidOperationException`. This is inherent to value types in .NET —
-prefer the factory methods (`Success`, `Failure`, `Create`) and avoid
-`default`. If you must defend against it on the read side, use
+Because `Result<T>` is a `readonly struct`, the runtime can produce `default`
+instances. A `default(Result<string>)` reports `IsSuccess = true` and
+`ValueOrDefault = null`, but accessing `.Value` throws
+`InvalidOperationException`. Prefer the factory methods (`Success`, `Failure`,
+`Create`) and avoid `default`. For exception-free access on the read side, use
 `TryGetValue(out T value)` — it returns `false` for both failures and
-`default(Result<T>)` with a null value, so the happy path is exception-free.
+`default(Result<T>)` with a null value.
 
 **Why no `IResult` interface?**
 An interface would box the struct, defeating the zero-allocation goal.

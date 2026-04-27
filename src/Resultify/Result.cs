@@ -70,24 +70,8 @@ public readonly struct Result : IEquatable<Result>
     /// <param name="errors">The errors to include. Must be non-null, contain at least one element, and no null elements.</param>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="errors"/> is null.</exception>
     /// <exception cref="ArgumentException">Thrown when <paramref name="errors"/> is empty or contains null elements.</exception>
-    public static Result Failure(IEnumerable<Error> errors)
-    {
-        ArgumentNullException.ThrowIfNull(errors);
-        List<Error> list = [];
-        foreach (Error e in errors)
-        {
-            if (e is null)
-            {
-                throw new ArgumentException("Error elements must not be null.", nameof(errors));
-            }
-
-            list.Add(e);
-        }
-
-        return list.Count == 0
-            ? throw new ArgumentException("At least one error is required.", nameof(errors))
-            : FailureUnchecked(list.ToArray());
-    }
+    public static Result Failure(IEnumerable<Error> errors) =>
+        FailureUnchecked(ResultHelper.ValidateErrors(errors));
 
     // Internal factory used by combinators to forward an already-validated, immutable error list
     // without re-running the public Failure(IEnumerable<Error>) validation. Callers must guarantee
@@ -177,8 +161,7 @@ public readonly struct Result : IEquatable<Result>
         }
         catch (Exception ex)
         {
-            Error error = exceptionHandler?.Invoke(ex) ?? new ExceptionalError(ex);
-            return Failure(error);
+            return Failure(exceptionHandler?.Invoke(ex) ?? new ExceptionalError(ex));
         }
     }
 
@@ -197,8 +180,7 @@ public readonly struct Result : IEquatable<Result>
         }
         catch (Exception ex)
         {
-            Error error = exceptionHandler?.Invoke(ex) ?? new ExceptionalError(ex);
-            return Failure(error);
+            return Failure(exceptionHandler?.Invoke(ex) ?? new ExceptionalError(ex));
         }
     }
 
@@ -216,8 +198,7 @@ public readonly struct Result : IEquatable<Result>
         }
         catch (Exception ex)
         {
-            Error error = exceptionHandler?.Invoke(ex) ?? new ExceptionalError(ex);
-            return Failure(error);
+            return Failure(exceptionHandler?.Invoke(ex) ?? new ExceptionalError(ex));
         }
     }
 
@@ -235,8 +216,7 @@ public readonly struct Result : IEquatable<Result>
         }
         catch (Exception ex)
         {
-            Error error = exceptionHandler?.Invoke(ex) ?? new ExceptionalError(ex);
-            return Failure(error);
+            return Failure(exceptionHandler?.Invoke(ex) ?? new ExceptionalError(ex));
         }
     }
 

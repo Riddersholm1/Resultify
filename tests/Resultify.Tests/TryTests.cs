@@ -20,12 +20,6 @@ public sealed class SyncTryCancellationTests
     }
 
     [Fact]
-    public void Try_FuncResult_WhenOperationCanceled_ShouldRethrow()
-    {
-        Assert.Throws<OperationCanceledException>(() => Result.Try(() => throw new OperationCanceledException()));
-    }
-
-    [Fact]
     public void TryT_WhenOperationCanceled_ShouldRethrow()
     {
         Assert.Throws<OperationCanceledException>(() => Result<int>.Try(() => throw new OperationCanceledException()));

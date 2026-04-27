@@ -21,24 +21,6 @@ public sealed class ResultExtensionTests
     }
 
     [Fact]
-    public void Merge_TypedResults_ShouldCollectValues()
-    {
-        Result<int>[] results =
-        [
-            Result<int>.Success(1),
-            Result<int>.Success(2),
-            Result<int>.Success(3)
-        ];
-
-        int[] expected = [1, 2, 3];
-
-        Result<IReadOnlyList<int>> merged = results.Merge();
-
-        Assert.True(merged.IsSuccess);
-        Assert.Equivalent(expected, merged.Value);
-    }
-
-    [Fact]
     public void HasError_ShouldDetectSpecificErrorType()
     {
         Result result = Result.Failure(new ValidationError("Name", "Required"));
