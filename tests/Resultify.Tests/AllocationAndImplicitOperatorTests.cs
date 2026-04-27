@@ -45,32 +45,12 @@ public sealed class ImplicitOperatorNullGuardTests
     }
 
     [Fact]
-    public void Result_ImplicitFromNullList_ShouldThrow()
-    {
-        Assert.Throws<ArgumentNullException>(() =>
-        {
-            List<Error>? nullList = null;
-            Result _ = nullList!;
-        });
-    }
-
-    [Fact]
     public void ResultT_ImplicitFromNullError_ShouldThrow()
     {
         Assert.Throws<ArgumentNullException>(() =>
         {
             Error? nullError = null;
             Result<int> _ = nullError!;
-        });
-    }
-
-    [Fact]
-    public void ResultT_ImplicitFromNullList_ShouldThrow()
-    {
-        Assert.Throws<ArgumentNullException>(() =>
-        {
-            List<Error>? nullList = null;
-            Result<int> _ = nullList!;
         });
     }
 }

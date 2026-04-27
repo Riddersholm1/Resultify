@@ -7,11 +7,12 @@ namespace Resultify;
 /// </summary>
 public static class ResultExtensions
 {
-    // ── Merge for collections ────────────────────────────────
+    // ───────────────────- Merge for collections ───────────────────- //
 
     /// <summary>Merge a collection of results into a single result.</summary>
     public static Result Merge(this IEnumerable<Result> results)
     {
+        ArgumentNullException.ThrowIfNull(results);
         List<Error>? errors = null;
         foreach (Result r in results)
         {
@@ -24,21 +25,20 @@ public static class ResultExtensions
             errors.AddRange(r.Errors);
         }
 
-        // Errors come from already-validated failed Results, so we skip the public
-        // Failure overload's revalidation and materialize as an immutable array directly.
+        // Errors come from already-validated failed Results; skip revalidation and materialize directly.
         return errors is null
             ? Result.Success()
             : Result.FailureUnchecked(errors.ToArray());
     }
 
     /// <summary>
-    /// Merge a collection of <see cref="Result{TValue}"/> into a single result
-    /// containing all values (if all succeeded) or all errors.
-    /// Once any failure is observed, previously-collected values are discarded and
-    /// subsequent successes are ignored — only errors are aggregated.
+    /// Merges a collection of <see cref="Result{TValue}"/> into a single result.
+    /// Returns all values when every result succeeded, or all errors when any failed.
+    /// Once a failure is seen, collected values are discarded and only errors are aggregated.
     /// </summary>
     public static Result<IReadOnlyList<TValue>> Merge<TValue>(this IEnumerable<Result<TValue>> results)
     {
+        ArgumentNullException.ThrowIfNull(results);
         List<TValue>? values = null;
         List<Error>? errors = null;
 
@@ -65,27 +65,6 @@ public static class ResultExtensions
         return errors is not null
             ? Result<IReadOnlyList<TValue>>.FailureUnchecked(errors.ToArray())
             : Result<IReadOnlyList<TValue>>.Success(values?.AsReadOnly() ?? (IReadOnlyList<TValue>)[]);
-    }
-
-    // ── Error querying ───────────────────────────────────────
-
-    extension(Result result)
-    {
-        /// <summary>Check if the result contains an error of the specified type.</summary>
-        public bool HasError<TError>() where TError : Error =>
-            result.Errors.OfType<TError>().Any();
-
-        /// <summary>Check if the result contains an error of the specified type matching a predicate.</summary>
-        public bool HasError<TError>(Func<TError, bool> predicate) where TError : Error =>
-            result.Errors.OfType<TError>().Any(predicate);
-
-        /// <summary>Check if the result contains an error with the specified code.</summary>
-        public bool HasErrorCode(string code) =>
-            result.Errors.Any(e => e.Code == code);
-
-        /// <summary>Check if any error in the result was caused by a specific exception type.</summary>
-        public bool HasException<TException>() where TException : Exception =>
-            result.Errors.OfType<ExceptionalError>().Any(e => e.Exception is TException);
     }
 
     // ── Async pipeline helpers ───────────────────────────────
@@ -180,12 +159,7 @@ public static class ResultExtensions
         public async Task<Result<TValue>> TapErrorAsync(Func<IReadOnlyList<Error>, Task> action)
         {
             Result<TValue> result = await resultTask.ConfigureAwait(false);
-            if (result.IsFailure)
-            {
-                await action(result.Errors).ConfigureAwait(false);
-            }
-
-            return result;
+            return await result.TapErrorAsync(action).ConfigureAwait(false);
         }
 
         /// <summary>Switch over an async Result pipeline.</summary>
@@ -193,6 +167,13 @@ public static class ResultExtensions
         {
             Result<TValue> result = await resultTask.ConfigureAwait(false);
             result.Switch(onSuccess, onFailure);
+        }
+
+        /// <summary>SwitchAsync over an async Result pipeline.</summary>
+        public async Task SwitchAsync(Func<TValue, Task> onSuccess, Func<IReadOnlyList<Error>, Task> onFailure)
+        {
+            Result<TValue> result = await resultTask.ConfigureAwait(false);
+            await result.SwitchAsync(onSuccess, onFailure).ConfigureAwait(false);
         }
 
         /// <summary>Bind to non-generic Result over an async Result pipeline.</summary>
@@ -310,12 +291,7 @@ public static class ResultExtensions
         public async Task<Result> TapErrorAsync(Func<IReadOnlyList<Error>, Task> action)
         {
             Result result = await resultTask.ConfigureAwait(false);
-            if (result.IsFailure)
-            {
-                await action(result.Errors).ConfigureAwait(false);
-            }
-
-            return result;
+            return await result.TapErrorAsync(action).ConfigureAwait(false);
         }
 
         /// <summary>Ensure over an async non-generic Result pipeline.</summary>
@@ -339,11 +315,25 @@ public static class ResultExtensions
             result.Switch(onSuccess, onFailure);
         }
 
+        /// <summary>SwitchAsync over an async non-generic Result pipeline.</summary>
+        public async Task SwitchAsync(Func<Task> onSuccess, Func<IReadOnlyList<Error>, Task> onFailure)
+        {
+            Result result = await resultTask.ConfigureAwait(false);
+            await result.SwitchAsync(onSuccess, onFailure).ConfigureAwait(false);
+        }
+
         /// <summary>Check if the awaited result contains an error of the specified type.</summary>
         public async Task<bool> HasError<TError>() where TError : Error
         {
             Result result = await resultTask.ConfigureAwait(false);
             return result.HasError<TError>();
+        }
+
+        /// <summary>Check if the awaited result contains an error of the specified type matching a predicate.</summary>
+        public async Task<bool> HasError<TError>(Func<TError, bool> predicate) where TError : Error
+        {
+            Result result = await resultTask.ConfigureAwait(false);
+            return result.HasError(predicate);
         }
 
         /// <summary>Check if the awaited result contains an error with the specified code.</summary>

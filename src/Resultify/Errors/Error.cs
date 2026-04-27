@@ -3,9 +3,8 @@ using System.Collections.Immutable;
 namespace Resultify.Errors;
 
 /// <summary>
-/// Represents an error with a machine-readable <see cref="Code"/> and a human-readable <see cref="Message"/>.
-/// Immutable — use <c>With*</c> methods or <c>with</c> expressions to produce new instances.
-/// Instances are safe to share across threads.
+/// An immutable error with a machine-readable <see cref="Code"/> and a human-readable <see cref="Message"/>.
+/// Use <c>With*</c> methods or <c>with</c> expressions to produce modified copies.
 /// </summary>
 public record Error
 {
@@ -21,7 +20,7 @@ public record Error
     /// <summary>A generic unknown error for use as a last-resort fallback.</summary>
     public static readonly Error Unknown = new("General.Unknown", "An unknown error occurred.");
 
-    /// <summary>A stable, machine-readable identifier, e.g. <c>"User.NotFound"</c>. Useful for i18n, logs, API responses.</summary>
+    /// <summary>A stable, machine-readable identifier, e.g. <c>"User.NotFound"</c>.</summary>
     /// <exception cref="ArgumentNullException">Thrown when set to <c>null</c> via a <c>with</c> expression.</exception>
     public string Code
     {
@@ -45,8 +44,10 @@ public record Error
         }
     }
 
-    /// <summary>Structured metadata attached to this error.</summary>
-    /// <exception cref="ArgumentNullException">Thrown when set to <c>null</c> via a <c>with</c> expression.</exception>
+    /// <summary>
+    /// Structured key-value metadata attached to this error.
+    /// Use <see cref="WithMetadata(string, object)"/> to add entries — it returns a new instance.
+    /// </summary>
     public IReadOnlyDictionary<string, object> Metadata
     {
         get;
@@ -57,8 +58,10 @@ public record Error
         }
     } = ImmutableDictionary<string, object>.Empty;
 
-    /// <summary>Causal chain of errors or exceptions that led to this error.</summary>
-    /// <exception cref="ArgumentNullException">Thrown when set to <c>null</c> via a <c>with</c> expression.</exception>
+    /// <summary>
+    /// Causal chain of errors or exceptions that led to this error.
+    /// Use <see cref="CausedBy(Error)"/> to append causes — it returns a new instance.
+    /// </summary>
     public IReadOnlyList<Error> Causes
     {
         get;
@@ -84,7 +87,8 @@ public record Error
     /// <summary>Convenience constructor: create an error with just a message and an empty code.</summary>
     /// <param name="message">A human-readable description of what went wrong.</param>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="message"/> is null.</exception>
-    public Error(string message) : this(string.Empty, message) { }
+    public Error(string message)
+        : this(string.Empty, message) { }
 
     /// <summary>Deconstruct into the machine-readable code and human-readable message.</summary>
     public void Deconstruct(out string code, out string message)
@@ -101,8 +105,7 @@ public record Error
     {
         ArgumentNullException.ThrowIfNull(key);
         ArgumentNullException.ThrowIfNull(value);
-        ImmutableDictionary<string, object> current = Metadata as ImmutableDictionary<string, object>
-            ?? Metadata.ToImmutableDictionary();
+        ImmutableDictionary<string, object> current = Metadata as ImmutableDictionary<string, object> ?? Metadata.ToImmutableDictionary();
         return this with { Metadata = current.SetItem(key, value) };
     }
 
@@ -144,9 +147,6 @@ public record Error
     public Error CausedBy(IEnumerable<Error> causes)
     {
         ArgumentNullException.ThrowIfNull(causes);
-
-        // Single pass: walk the input once, validate as we go, and accumulate alongside
-        // the existing causes. Fails fast on the first null element.
         List<Error> combined = [.. Causes];
         foreach (Error c in causes)
         {
@@ -174,14 +174,12 @@ public record Error
     /// Returns a human-readable representation of the error, including its code (when present)
     /// and any causal chain. Intended for logs and debugging — not for end-user display.
     /// </summary>
-    public override string ToString() =>
-        string.IsNullOrEmpty(Code)
-            ? Causes.Count > 0
-                ? $"{Message} (caused by: {string.Join(", ", Causes)})"
-                : Message
-            : Causes.Count > 0
-                ? $"[{Code}] {Message} (caused by: {string.Join(", ", Causes)})"
-                : $"[{Code}] {Message}";
+    public override string ToString()
+    {
+        string codePrefix = string.IsNullOrEmpty(Code) ? string.Empty : $"[{Code}] ";
+        string causesSuffix = Causes.Count > 0 ? $" (caused by: {string.Join(", ", Causes)})" : string.Empty;
+        return $"{codePrefix}{Message}{causesSuffix}";
+    }
 
     /// <inheritdoc />
     public virtual bool Equals(Error? other)

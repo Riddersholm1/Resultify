@@ -4,27 +4,19 @@ using Resultify.Errors;
 namespace Resultify;
 
 /// <summary>
-/// Represents the outcome of an operation that returns a value of type <typeparamref name="TValue"/>.
-/// Value type — zero-allocation on the success path when <typeparamref name="TValue"/> is a value type.
-/// Instances are immutable and safe to share across threads.
+/// The outcome of an operation that returns a value of type <typeparamref name="TValue"/>.
+/// A <c>readonly struct</c> — zero allocation on the success path for value types.
 /// </summary>
 public readonly struct Result<TValue> : IEquatable<Result<TValue>>
 {
-
     private readonly IReadOnlyList<Error>? _errors;
 
     /// <summary>All errors. Empty when successful.</summary>
-    public IReadOnlyList<Error> Errors =>
-        _errors ?? ResultHelper.EmptyErrors;
+    public IReadOnlyList<Error> Errors => _errors ?? ResultHelper.EmptyErrors;
 
     /// <summary>
-    /// The first error when <see cref="IsFailure"/>; otherwise the sentinel <see cref="Error.None"/>.
-    /// <para>
-    /// ⚠️ Only meaningful when <see cref="IsFailure"/> is true. On a successful result this returns
-    /// <see cref="Error.None"/>, so <c>result.FirstError == someError</c> without a failure check can
-    /// match the sentinel unintentionally. Prefer <c>if (result.IsFailure) { ... result.FirstError ... }</c>.
-    /// </para>
-    /// Use <see cref="Errors"/> when you need all of them.
+    /// The first error when failed; otherwise <see cref="Error.None"/>.
+    /// Use <see cref="Errors"/> when you need all errors.
     /// </summary>
     public Error FirstError =>
         _errors is { Count: > 0 }
@@ -42,12 +34,11 @@ public readonly struct Result<TValue> : IEquatable<Result<TValue>>
         !IsSuccess;
 
     /// <summary>
-    /// The value of the result.
+    /// The success value.
     /// </summary>
     /// <exception cref="InvalidOperationException">
-    /// Thrown when <see cref="IsFailure"/> is true, or when <see cref="ValueOrDefault"/> is <c>null</c>
-    /// (e.g. on <c>default(Result&lt;T&gt;)</c> for reference-type <typeparamref name="TValue"/>,
-    /// which reports <see cref="IsSuccess"/> = <c>true</c> but has no meaningful value).
+    /// Thrown when the result is failed, or when <see cref="ValueOrDefault"/> is <c>null</c>
+    /// (e.g. on <c>default(Result&lt;T&gt;)</c> for reference types).
     /// Use <see cref="ValueOrDefault"/> or <see cref="TryGetValue"/> for exception-free access.
     /// </exception>
     [NotNull]
@@ -57,17 +48,10 @@ public readonly struct Result<TValue> : IEquatable<Result<TValue>>
         {
             if (IsFailure)
             {
-                throw new InvalidOperationException(
-                    $"Cannot access Value on a failed result. Errors: {string.Join("; ", Errors)}");
+                throw new InvalidOperationException($"Cannot access Value on a failed result. Errors: {string.Join("; ", Errors)}");
             }
 
-            if (ValueOrDefault is null)
-            {
-                throw new InvalidOperationException(
-                    "Cannot access Value when it is null (e.g. on default(Result<T>) for reference types). Use ValueOrDefault or TryGetValue for nullable access.");
-            }
-
-            return ValueOrDefault;
+            return ValueOrDefault ?? throw new InvalidOperationException("Cannot access Value when it is null (e.g. on default(Result<T>) for reference types). Use ValueOrDefault or TryGetValue for nullable access.");
         }
     }
 
@@ -103,15 +87,16 @@ public readonly struct Result<TValue> : IEquatable<Result<TValue>>
         _errors = errors;
     }
 
-    // ── Factory methods ──────────────────────────────────────
+    // ───────────────────- Factory methods ───────────────────- //
 
     /// <summary>Create a successful result with the given value.</summary>
     /// <param name="value">The value to wrap. Must not be null.</param>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="value"/> is null.</exception>
-    public static Result<TValue> Success(TValue value) =>
-        value is null
-            ? throw new ArgumentNullException(nameof(value))
-            : new Result<TValue>(value);
+    public static Result<TValue> Success(TValue value)
+    {
+        ArgumentNullException.ThrowIfNull(value);
+        return new Result<TValue>(value);
+    }
 
     /// <summary>Create a failed result from a single error.</summary>
     public static Result<TValue> Failure(Error error)
@@ -121,12 +106,19 @@ public readonly struct Result<TValue> : IEquatable<Result<TValue>>
     }
 
     /// <summary>Create a failed result from an error message.</summary>
-    public static Result<TValue> Failure(string errorMessage) =>
-        Failure(new Error(errorMessage));
+    public static Result<TValue> Failure(string errorMessage)
+    {
+        ArgumentNullException.ThrowIfNull(errorMessage);
+        return Failure(new Error(errorMessage));
+    }
 
     /// <summary>Create a failed result with a code and message.</summary>
-    public static Result<TValue> Failure(string code, string errorMessage) =>
-        Failure(new Error(code, errorMessage));
+    public static Result<TValue> Failure(string code, string errorMessage)
+    {
+        ArgumentNullException.ThrowIfNull(code);
+        ArgumentNullException.ThrowIfNull(errorMessage);
+        return Failure(new Error(code, errorMessage));
+    }
 
     /// <summary>Create a failed result from multiple errors.</summary>
     /// <param name="errors">The errors to include. Must be non-null, contain at least one element, and no null elements.</param>
@@ -135,9 +127,6 @@ public readonly struct Result<TValue> : IEquatable<Result<TValue>>
     public static Result<TValue> Failure(IEnumerable<Error> errors)
     {
         ArgumentNullException.ThrowIfNull(errors);
-
-        // Single pass: walk the input once, validate as we go, and accumulate into a list.
-        // Fails fast on the first null element rather than after a separate full materialization.
         List<Error> list = [];
         foreach (Error e in errors)
         {
@@ -154,10 +143,9 @@ public readonly struct Result<TValue> : IEquatable<Result<TValue>>
             : new Result<TValue>(list.ToArray());
     }
 
-    // Internal pass-through factory used by combinators (Map/Bind/ToResult, etc.) to forward
-    // an already-validated, immutable error list without re-running the validation+copy of
-    // the public Failure(IEnumerable<Error>) overload. Callers must guarantee the list is
-    // non-null, non-empty, contains no null elements, and will not be mutated afterwards.
+    // Internal factory used by combinators to forward an already-validated, immutable error list
+    // without re-running the public Failure(IEnumerable<Error>) validation. Callers must guarantee
+    // the list is non-null, non-empty, contains no null elements, and will not be mutated afterwards.
     internal static Result<TValue> FailureUnchecked(IReadOnlyList<Error> errors) =>
         new(errors);
 
@@ -170,7 +158,7 @@ public readonly struct Result<TValue> : IEquatable<Result<TValue>>
             ? Success(value)
             : Failure(Error.NullValue);
 
-    // ── Conditional factories ────────────────────────────────
+    // ───────────────────- Conditional factories ───────────────────- //
 
     /// <summary>Returns Success if the condition is true; otherwise Failure.</summary>
     public static Result<TValue> SuccessIf(bool condition, TValue value, Error error) =>
@@ -185,20 +173,44 @@ public readonly struct Result<TValue> : IEquatable<Result<TValue>>
             : Failure(errorMessage);
 
     /// <summary>Returns Success if the condition is true; otherwise Failure with lazy error.</summary>
-    public static Result<TValue> SuccessIf(bool condition, TValue value, Func<Error> errorFactory) =>
-        condition
+    public static Result<TValue> SuccessIf(bool condition, TValue value, Func<Error> errorFactory)
+    {
+        ArgumentNullException.ThrowIfNull(errorFactory);
+        return condition
             ? Success(value)
             : Failure(errorFactory());
+    }
 
-    // ── Try
+    /// <summary>Returns Failure if the condition is true; otherwise Success.</summary>
+    public static Result<TValue> FailureIf(bool condition, TValue value, Error error) =>
+        condition
+            ? Failure(error)
+            : Success(value);
+
+    /// <summary>Returns Failure if the condition is true; otherwise Success.</summary>
+    public static Result<TValue> FailureIf(bool condition, TValue value, string errorMessage) =>
+        condition
+            ? Failure(errorMessage)
+            : Success(value);
+
+    /// <summary>Returns Failure if the condition is true; otherwise Success with lazy error.</summary>
+    public static Result<TValue> FailureIf(bool condition, TValue value, Func<Error> errorFactory)
+    {
+        ArgumentNullException.ThrowIfNull(errorFactory);
+        return condition
+            ? Failure(errorFactory())
+            : Success(value);
+    }
+
+    // ───────────────────- Try ───────────────────- //
 
     /// <summary>
-    /// Execute a function, catching exceptions as errors.
-    /// A <c>null</c> return value produces a failure with <see cref="Error.NullValue"/>
-    /// rather than wrapping the internal null-check as an <see cref="ExceptionalError"/>.
+    /// Executes a function, catching exceptions as errors.
+    /// A <c>null</c> return value produces a failure with <see cref="Error.NullValue"/>.
     /// </summary>
     public static Result<TValue> Try(Func<TValue> func, Func<Exception, Error>? exceptionHandler = null)
     {
+        ArgumentNullException.ThrowIfNull(func);
         try
         {
             return Create(func());
@@ -215,12 +227,12 @@ public readonly struct Result<TValue> : IEquatable<Result<TValue>>
     }
 
     /// <summary>
-    /// Execute an async function, catching exceptions as errors.
-    /// A <c>null</c> return value produces a failure with <see cref="Error.NullValue"/>
-    /// rather than wrapping the internal null-check as an <see cref="ExceptionalError"/>.
+    /// Executes an async function, catching exceptions as errors.
+    /// A <c>null</c> return value produces a failure with <see cref="Error.NullValue"/>.
     /// </summary>
     public static async Task<Result<TValue>> TryAsync(Func<Task<TValue>> func, Func<Exception, Error>? exceptionHandler = null)
     {
+        ArgumentNullException.ThrowIfNull(func);
         try
         {
             return Create(await func().ConfigureAwait(false));
@@ -236,53 +248,109 @@ public readonly struct Result<TValue> : IEquatable<Result<TValue>>
         }
     }
 
-    // ── Combinators ──────────────────────────────────────────
+    /// <summary>Execute a function returning a <see cref="Result{TValue}"/>, catching exceptions.</summary>
+    public static Result<TValue> Try(Func<Result<TValue>> func, Func<Exception, Error>? exceptionHandler = null)
+    {
+        ArgumentNullException.ThrowIfNull(func);
+        try
+        {
+            return func();
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            Error error = exceptionHandler?.Invoke(ex) ?? new ExceptionalError(ex);
+            return Failure(error);
+        }
+    }
+
+    /// <summary>Execute an async function returning a <see cref="Result{TValue}"/>, catching exceptions.</summary>
+    public static async Task<Result<TValue>> TryAsync(Func<Task<Result<TValue>>> func, Func<Exception, Error>? exceptionHandler = null)
+    {
+        ArgumentNullException.ThrowIfNull(func);
+        try
+        {
+            return await func().ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            Error error = exceptionHandler?.Invoke(ex) ?? new ExceptionalError(ex);
+            return Failure(error);
+        }
+    }
+
+    // ───────────────────- Combinators ───────────────────- //
 
     /// <summary>
-    /// Transform the value if successful. Errors are propagated unchanged.
-    /// A <c>null</c> mapped value produces a failure with <see cref="Error.NullValue"/>,
-    /// matching the semantics of <see cref="Create(TValue)"/> and <see cref="Try(Func{TValue}, Func{Exception, Error}?)"/>.
+    /// Transforms the value if successful. Errors are propagated unchanged.
+    /// A <c>null</c> mapped value produces a failure with <see cref="Error.NullValue"/>.
     /// </summary>
-    public Result<TNew> Map<TNew>(Func<TValue, TNew> mapper) =>
-        IsSuccess
+    public Result<TNew> Map<TNew>(Func<TValue, TNew> mapper)
+    {
+        ArgumentNullException.ThrowIfNull(mapper);
+        return IsSuccess
             ? Result<TNew>.Create(mapper(Value))
             : Result<TNew>.FailureUnchecked(Errors);
+    }
 
     /// <summary>
     /// Async Map. A <c>null</c> mapped value produces a failure with <see cref="Error.NullValue"/>.
     /// </summary>
-    public async Task<Result<TNew>> MapAsync<TNew>(Func<TValue, Task<TNew>> mapper) =>
-        IsSuccess
+    public async Task<Result<TNew>> MapAsync<TNew>(Func<TValue, Task<TNew>> mapper)
+    {
+        ArgumentNullException.ThrowIfNull(mapper);
+        return IsSuccess
             ? Result<TNew>.Create(await mapper(Value).ConfigureAwait(false))
             : Result<TNew>.FailureUnchecked(Errors);
+    }
 
     /// <summary>Chain a dependent operation that also returns a Result.</summary>
-    public Result<TNew> Bind<TNew>(Func<TValue, Result<TNew>> bind) =>
-        IsSuccess
+    public Result<TNew> Bind<TNew>(Func<TValue, Result<TNew>> bind)
+    {
+        ArgumentNullException.ThrowIfNull(bind);
+        return IsSuccess
             ? bind(Value)
             : Result<TNew>.FailureUnchecked(Errors);
+    }
 
     /// <summary>Async Bind.</summary>
-    public Task<Result<TNew>> BindAsync<TNew>(Func<TValue, Task<Result<TNew>>> bind) =>
-        IsSuccess
+    public Task<Result<TNew>> BindAsync<TNew>(Func<TValue, Task<Result<TNew>>> bind)
+    {
+        ArgumentNullException.ThrowIfNull(bind);
+        return IsSuccess
             ? bind(Value)
             : Task.FromResult(Result<TNew>.FailureUnchecked(Errors));
+    }
 
     /// <summary>Bind to a non-generic Result (e.g. for void operations).</summary>
-    public Result Bind(Func<TValue, Result> bind) =>
-        IsSuccess
+    public Result Bind(Func<TValue, Result> bind)
+    {
+        ArgumentNullException.ThrowIfNull(bind);
+        return IsSuccess
             ? bind(Value)
             : Result.FailureUnchecked(Errors);
+    }
 
     /// <summary>Async Bind to non-generic Result.</summary>
-    public Task<Result> BindAsync(Func<TValue, Task<Result>> bind) =>
-        IsSuccess
+    public Task<Result> BindAsync(Func<TValue, Task<Result>> bind)
+    {
+        ArgumentNullException.ThrowIfNull(bind);
+        return IsSuccess
             ? bind(Value)
             : Task.FromResult(Result.FailureUnchecked(Errors));
+    }
 
     /// <summary>Execute a side effect if successful. Returns this result unchanged.</summary>
     public Result<TValue> Tap(Action<TValue> action)
     {
+        ArgumentNullException.ThrowIfNull(action);
         if (IsSuccess)
         {
             action(Value);
@@ -294,6 +362,7 @@ public readonly struct Result<TValue> : IEquatable<Result<TValue>>
     /// <summary>Async Tap.</summary>
     public async Task<Result<TValue>> TapAsync(Func<TValue, Task> action)
     {
+        ArgumentNullException.ThrowIfNull(action);
         if (IsSuccess)
         {
             await action(Value).ConfigureAwait(false);
@@ -305,6 +374,7 @@ public readonly struct Result<TValue> : IEquatable<Result<TValue>>
     /// <summary>Execute a side effect if failed. Returns this result unchanged.</summary>
     public Result<TValue> TapError(Action<IReadOnlyList<Error>> action)
     {
+        ArgumentNullException.ThrowIfNull(action);
         if (IsFailure)
         {
             action(Errors);
@@ -316,6 +386,7 @@ public readonly struct Result<TValue> : IEquatable<Result<TValue>>
     /// <summary>Async TapError.</summary>
     public async Task<Result<TValue>> TapErrorAsync(Func<IReadOnlyList<Error>, Task> action)
     {
+        ArgumentNullException.ThrowIfNull(action);
         if (IsFailure)
         {
             await action(Errors).ConfigureAwait(false);
@@ -325,7 +396,7 @@ public readonly struct Result<TValue> : IEquatable<Result<TValue>>
     }
 
     /// <summary>Add a validation gate on the value.</summary>
-    /// /// <exception cref="ArgumentNullException">Thrown when <paramref name="predicate"/> or <paramref name="error"/> is null.</exception>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="predicate"/> or <paramref name="error"/> is null.</exception>
     public Result<TValue> Ensure(Func<TValue, bool> predicate, Error error)
     {
         ArgumentNullException.ThrowIfNull(predicate);
@@ -365,20 +436,26 @@ public readonly struct Result<TValue> : IEquatable<Result<TValue>>
     }
 
     /// <summary>Pattern match: execute one of two functions depending on success/failure.</summary>
-    public TOut Match<TOut>(Func<TValue, TOut> onSuccess, Func<IReadOnlyList<Error>, TOut> onFailure) =>
-        IsSuccess
-            ? onSuccess(Value)
-            : onFailure(Errors);
+    public TOut Match<TOut>(Func<TValue, TOut> onSuccess, Func<IReadOnlyList<Error>, TOut> onFailure)
+    {
+        ArgumentNullException.ThrowIfNull(onSuccess);
+        ArgumentNullException.ThrowIfNull(onFailure);
+        return IsSuccess ? onSuccess(Value) : onFailure(Errors);
+    }
 
     /// <summary>Async Match.</summary>
-    public Task<TOut> MatchAsync<TOut>(Func<TValue, Task<TOut>> onSuccess, Func<IReadOnlyList<Error>, Task<TOut>> onFailure) =>
-        IsSuccess
-            ? onSuccess(Value)
-            : onFailure(Errors);
+    public Task<TOut> MatchAsync<TOut>(Func<TValue, Task<TOut>> onSuccess, Func<IReadOnlyList<Error>, Task<TOut>> onFailure)
+    {
+        ArgumentNullException.ThrowIfNull(onSuccess);
+        ArgumentNullException.ThrowIfNull(onFailure);
+        return IsSuccess ? onSuccess(Value) : onFailure(Errors);
+    }
 
     /// <summary>Execute one of two actions depending on success/failure.</summary>
     public void Switch(Action<TValue> onSuccess, Action<IReadOnlyList<Error>> onFailure)
     {
+        ArgumentNullException.ThrowIfNull(onSuccess);
+        ArgumentNullException.ThrowIfNull(onFailure);
         if (IsSuccess)
         {
             onSuccess(Value);
@@ -389,7 +466,22 @@ public readonly struct Result<TValue> : IEquatable<Result<TValue>>
         }
     }
 
-    // ── Conversion ───────────────────────────────────────────
+    /// <summary>Execute one of two actions depending on success/failure.</summary>
+    public async Task SwitchAsync(Func<TValue, Task> onSuccess, Func<IReadOnlyList<Error>, Task> onFailure)
+    {
+        ArgumentNullException.ThrowIfNull(onSuccess);
+        ArgumentNullException.ThrowIfNull(onFailure);
+        if (IsSuccess)
+        {
+            await onSuccess(Value).ConfigureAwait(false);
+        }
+        else
+        {
+            await onFailure(Errors).ConfigureAwait(false);
+        }
+    }
+
+    // ───────────────────- Conversion ───────────────────- //
 
     /// <summary>Drop the value, keeping only the success/failure state and errors.</summary>
     public Result ToResult() =>
@@ -397,17 +489,7 @@ public readonly struct Result<TValue> : IEquatable<Result<TValue>>
             ? Result.Success()
             : Result.FailureUnchecked(Errors);
 
-    /// <summary>
-    /// Convert to a Result with a different value type.
-    /// A <c>null</c> converted value produces a failure with <see cref="Error.NullValue"/>,
-    /// matching the semantics of <see cref="Map{TNew}(Func{TValue, TNew})"/>.
-    /// </summary>
-    public Result<TNew> ToResult<TNew>(Func<TValue, TNew> converter) =>
-        IsSuccess
-            ? Result<TNew>.Create(converter(Value))
-            : Result<TNew>.FailureUnchecked(Errors);
-
-    // ── Deconstruct ──────────────────────────────────────────
+    // ───────────────────- Deconstruct ───────────────────- //
 
     /// <summary>Deconstructs the result into its components.</summary>
     /// <param name="isSuccess">Whether the result is successful.</param>
@@ -420,7 +502,7 @@ public readonly struct Result<TValue> : IEquatable<Result<TValue>>
         errors = Errors;
     }
 
-    // ── Error querying ───────────────────────────────────────
+    // ───────────────────- Error querying ───────────────────- //
 
     /// <summary>Check if the result contains an error of the specified type.</summary>
     public bool HasError<TError>() where TError : Error =>
@@ -438,10 +520,10 @@ public readonly struct Result<TValue> : IEquatable<Result<TValue>>
     public bool HasException<TException>() where TException : Exception =>
         Errors.OfType<ExceptionalError>().Any(e => e.Exception is TException);
 
-    // ── Implicit conversions ─────────────────────────────────
+    // ───────────────────- Implicit conversions ───────────────────- //
 
     /// <summary>
-    /// Implicitly convert a value to a Result. Non-null becomes <see cref="Success(TValue)"/>;
+    /// Implicitly converts a value to a Result. Non-null becomes <see cref="Success(TValue)"/>;
     /// null becomes a failure with <see cref="Error.NullValue"/>.
     /// </summary>
     public static implicit operator Result<TValue>(TValue? value) =>
@@ -455,16 +537,7 @@ public readonly struct Result<TValue> : IEquatable<Result<TValue>>
         return Failure(error);
     }
 
-    /// <summary>Implicitly convert a list of Errors to a failed Result.</summary>
-    /// <exception cref="ArgumentNullException">Thrown when <paramref name="errors"/> is null.</exception>
-    /// <exception cref="ArgumentException">Thrown when <paramref name="errors"/> is empty.</exception>
-    public static implicit operator Result<TValue>(List<Error> errors)
-    {
-        ArgumentNullException.ThrowIfNull(errors);
-        return Failure(errors);
-    }
-
-    // ── Equality ─────────────────────────────────────────────
+    // ───────────────────- Equality ───────────────────- //
 
     /// <inheritdoc />
     public bool Equals(Result<TValue> other)
@@ -513,15 +586,4 @@ public readonly struct Result<TValue> : IEquatable<Result<TValue>>
         IsSuccess
             ? $"Result<{typeof(TValue).Name}>: Success ({ValueOrDefault?.ToString() ?? "null"})"
             : $"Result<{typeof(TValue).Name}>: Failure ({string.Join("; ", Errors)})";
-}
-
-/// <summary>
-/// Holds constants shared across all <c>Result&lt;TValue&gt;</c> closed types,
-/// ensuring a single allocation regardless of how many type parameters are used.
-/// </summary>
-internal static class ResultHelper
-{
-    // Shared empty list so reading Errors on a successful result is allocation-free
-    // and not duplicated per closed generic type.
-    internal static readonly IReadOnlyList<Error> EmptyErrors = [];
 }

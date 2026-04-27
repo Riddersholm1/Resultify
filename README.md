@@ -3,10 +3,10 @@
 A modern, **immutable** Result pattern library for **.NET 10**.
 
 - Zero-allocation success path — `Result` and `Result<TValue>` are `readonly struct`
-- Immutable and thread-safe — `Result`, `Result<TValue>`, and `Error` can be freely shared across threads
-- Immutable errors with machine-readable codes, metadata, and causal chains
+- Immutable and thread-safe — all types can be freely shared across threads
+- Errors with machine-readable codes, structured metadata, and causal chains
 - Functional combinators — `Map`, `Bind`, `Match`, `Tap`, `Ensure`, `Switch`
-- First-class async — every combinator has an async overload + fluent `Task<Result<T>>` extensions
+- First-class async — every combinator has an async overload and fluent `Task<Result<T>>` extensions
 - Multi-error support for validation aggregation
 - AOT and trimming compatible
 - Zero runtime dependencies
@@ -43,8 +43,7 @@ Result result = Result.FailureIf(string.IsNullOrEmpty(name), "Name is required")
 ## Errors
 
 Errors are immutable `record` types with a machine-readable `Code` and a
-human-readable `Message`. The code is useful for i18n, structured logs, and
-API responses.
+human-readable `Message`. The code is useful for i18n, structured logs, and API responses.
 
 ```csharp
 // Full form
@@ -155,13 +154,15 @@ IActionResult response = result.Match(
 
 ### Switch — side effects based on outcome
 
+Like `Match` but returns `void` (or `Task` for the async overload).
+
 ```csharp
 result.Switch(
     onSuccess: value => logger.LogInformation("Got {Value}", value),
     onFailure: errors => logger.LogWarning("Failed: {Errors}", errors));
 ```
 
-### Tap — side effects without changing the result
+### Tap
 
 ```csharp
 var result = GetCustomer(id)
@@ -241,13 +242,13 @@ if (result.HasException<TimeoutException>()) { /* retry */ }
 Combine multiple results:
 
 ```csharp
-// Non-generic — combines errors
+// Non-generic — accepts a params ReadOnlySpan, combines all errors
 Result merged = Result.Merge(result1, result2, result3);
 
-// Extension on collection (non-generic)
+// Extension on IEnumerable<Result>
 Result merged = results.Merge();
 
-// Extension on collection (typed) — either all values or all errors
+// Extension on IEnumerable<Result<TValue>> — either all values or all errors
 Result<IReadOnlyList<int>> merged = new[]
 {
     Result<int>.Success(1),
@@ -287,17 +288,14 @@ Result<int> r = new Error("fail");    // Failure
 
 ## Thread safety
 
-`Result`, `Result<TValue>`, `Error`, and every built-in error subtype
-(`ValidationError`, `NotFoundError`, `ConflictError`, `ForbiddenError`,
-`ExceptionalError`) are **immutable**. Instances can be shared across threads
-without any synchronization:
+`Result`, `Result<TValue>`, `Error`, and all built-in error subtypes are **immutable**.
+Instances can be shared across threads without any synchronization:
 
-- `Result` / `Result<T>` are `readonly struct` — fields can never change after construction.
+- `Result` / `Result<T>` are `readonly struct` — fields cannot change after construction.
 - `Error.Code`, `Error.Message`, `Error.Metadata`, and `Error.Causes` are init-only.
   `WithMetadata` / `CausedBy` return *new* instances rather than mutating.
-- The internal `Errors` list is materialized as an `Error[]` via a defensive copy in
-  `Result.Failure(IEnumerable<Error>)`, so external mutation of the source collection
-  never bleeds into the result.
+- The internal `Errors` list is stored as an `Error[]` copied from the source collection,
+  so external mutation of the source never affects the result.
 - Successful results share a single empty `IReadOnlyList<Error>` instance — reading
   `.Errors` on a success never allocates and is safe under concurrent readers.
 
