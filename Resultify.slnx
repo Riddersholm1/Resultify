@@ -1,0 +1,14 @@
+<Solution>
+  <Folder Name="/.SolutionItems/">
+    <File Path=".github/workflows/pipeline.yml" />
+    <File Path=".gitignore" />
+    <File Path="LICENSE" />
+    <File Path="README.md" />
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="src/Resultify/Resultify.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Resultify.Tests/Resultify.Tests.csproj" />
+  </Folder>
+</Solution>

@@ -1,0 +1,48 @@
+<Project Sdk="Microsoft.NET.Sdk">
+	<PropertyGroup>
+		<TargetFramework>net10.0</TargetFramework>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+		<LangVersion>latest</LangVersion>
+		<GenerateDocumentationFile>true</GenerateDocumentationFile>
+		<DocumentationFile>bin\$(Configuration)\$(TargetFramework)\$(AssemblyName).xml</DocumentationFile>
+		<EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
+		<AnalysisLevel>latest-recommended</AnalysisLevel>
+		<IsAotCompatible>true</IsAotCompatible>
+		<IsTrimmable>true</IsTrimmable>
+
+		<!-- NuGet package metadata -->
+		<PackageId>Riddersholm.Resultify</PackageId>
+		<Version>0.0.0</Version>
+		<Authors>Jesper Bruhn Riddersholm</Authors>
+		<Company>Jesper Bruhn Riddersholm</Company>
+		<Product>Resultify</Product>
+		<Title>Resultify</Title>
+		<Description>A modern, immutable, allocation-conscious Result pattern for .NET 10. Zero-allocation success path via readonly struct, first-class async pipelines, and a rich error model with codes, metadata, and causal chains.</Description>
+		<PackageTags>result;result-pattern;railway-oriented-programming;rop;functional;error-handling;ddd;clean-architecture;cqs</PackageTags>
+		<PackageLicenseExpression>MIT</PackageLicenseExpression>
+		<PackageReadmeFile>README.md</PackageReadmeFile>
+		<PackageProjectUrl>https://github.com/Riddersholm1/Resultify</PackageProjectUrl>
+		<RepositoryUrl>https://github.com/Riddersholm1/Resultify</RepositoryUrl>
+		<RepositoryType>git</RepositoryType>
+		<Copyright>Copyright (c) 2026 Jesper Bruhn Riddersholm</Copyright>
+		<IncludeSymbols>true</IncludeSymbols>
+		<SymbolPackageFormat>snupkg</SymbolPackageFormat>
+		<PublishRepositoryUrl>true</PublishRepositoryUrl>
+		<EmbedUntrackedSources>true</EmbedUntrackedSources>
+		<DebugType>portable</DebugType>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<None Include="..\..\README.md" Pack="true" PackagePath="\" />
+		<None Include="..\..\LICENSE" Pack="true" PackagePath="\" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Microsoft.SourceLink.GitHub" Version="10.0.300" PrivateAssets="All" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<InternalsVisibleTo Include="Resultify.Tests" />
+	</ItemGroup>
+</Project>

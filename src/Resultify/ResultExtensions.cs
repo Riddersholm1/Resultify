@@ -1,0 +1,431 @@
+using Resultify.Errors;
+
+namespace Resultify;
+
+/// <summary>
+/// Extension methods for <see cref="Result"/> and <see cref="Result{TValue}"/>.
+/// </summary>
+public static class ResultExtensions
+{
+    // ───────────────────- Merge for collections ───────────────────- //
+
+    /// <summary>Merge a collection of results into a single result.</summary>
+    public static Result Merge(this IEnumerable<Result> results)
+    {
+        ArgumentNullException.ThrowIfNull(results);
+        List<Error>? errors = null;
+        foreach (Result r in results)
+        {
+            if (!r.IsFailure)
+            {
+                continue;
+            }
+
+            errors ??= [];
+            errors.AddRange(r.Errors);
+        }
+
+        // Errors come from already-validated failed Results; skip revalidation and materialize directly.
+        return errors is null
+            ? Result.Success()
+            : Result.FailureUnchecked(errors.ToArray());
+    }
+
+    /// <summary>
+    /// Merges a collection of <see cref="Result{TValue}"/> into a single result.
+    /// Returns all values when every result succeeded, or all errors when any failed.
+    /// Once a failure is seen, collected values are discarded and only errors are aggregated.
+    /// </summary>
+    public static Result<IReadOnlyList<TValue>> Merge<TValue>(this IEnumerable<Result<TValue>> results)
+    {
+        ArgumentNullException.ThrowIfNull(results);
+        List<TValue>? values = null;
+        List<Error>? errors = null;
+
+        foreach (Result<TValue> r in results)
+        {
+            if (r.IsFailure)
+            {
+                errors ??= [];
+                errors.AddRange(r.Errors);
+                values = null; // drop any collected values — we're going to fail
+                continue;
+            }
+
+            if (errors is not null)
+            {
+                continue; // already failing; ignore successful values
+            }
+
+            values ??= [];
+            values.Add(r.Value);
+        }
+
+        // Errors come from already-validated failed Results, so we skip revalidation.
+        return errors is not null
+            ? Result<IReadOnlyList<TValue>>.FailureUnchecked(errors.ToArray())
+            : Result<IReadOnlyList<TValue>>.Success(values?.AsReadOnly() ?? (IReadOnlyList<TValue>)[]);
+    }
+
+    // ── Async pipeline helpers ───────────────────────────────
+
+    extension<TValue>(Task<Result<TValue>> resultTask)
+    {
+        /// <summary>Map over an async Result pipeline.</summary>
+        public async Task<Result<TNew>> Map<TNew>(Func<TValue, TNew> mapper)
+        {
+            ArgumentNullException.ThrowIfNull(resultTask);
+
+            Result<TValue> result = await resultTask.ConfigureAwait(false);
+            return result.Map(mapper);
+        }
+
+        /// <summary>Map over an async Result pipeline with an async mapper.</summary>
+        public async Task<Result<TNew>> MapAsync<TNew>(Func<TValue, Task<TNew>> mapper)
+        {
+            ArgumentNullException.ThrowIfNull(resultTask);
+
+            Result<TValue> result = await resultTask.ConfigureAwait(false);
+            return await result.MapAsync(mapper).ConfigureAwait(false);
+        }
+
+        /// <summary>Bind over an async Result pipeline.</summary>
+        public async Task<Result<TNew>> Bind<TNew>(Func<TValue, Result<TNew>> bind)
+        {
+            ArgumentNullException.ThrowIfNull(resultTask);
+
+            Result<TValue> result = await resultTask.ConfigureAwait(false);
+            return result.Bind(bind);
+        }
+
+        /// <summary>Bind over an async Result pipeline with async bind function.</summary>
+        public async Task<Result<TNew>> BindAsync<TNew>(Func<TValue, Task<Result<TNew>>> bind)
+        {
+            ArgumentNullException.ThrowIfNull(resultTask);
+
+            Result<TValue> result = await resultTask.ConfigureAwait(false);
+            return await result.BindAsync(bind).ConfigureAwait(false);
+        }
+
+        /// <summary>Tap over an async Result pipeline.</summary>
+        public async Task<Result<TValue>> Tap(Action<TValue> action)
+        {
+            ArgumentNullException.ThrowIfNull(resultTask);
+
+            Result<TValue> result = await resultTask.ConfigureAwait(false);
+            return result.Tap(action);
+        }
+
+        /// <summary>Tap over an async Result pipeline with an async action.</summary>
+        public async Task<Result<TValue>> TapAsync(Func<TValue, Task> action)
+        {
+            ArgumentNullException.ThrowIfNull(resultTask);
+
+            Result<TValue> result = await resultTask.ConfigureAwait(false);
+            return await result.TapAsync(action).ConfigureAwait(false);
+        }
+
+        /// <summary>Ensure over an async Result pipeline.</summary>
+        public async Task<Result<TValue>> Ensure(Func<TValue, bool> predicate, Error error)
+        {
+            ArgumentNullException.ThrowIfNull(resultTask);
+
+            Result<TValue> result = await resultTask.ConfigureAwait(false);
+            return result.Ensure(predicate, error);
+        }
+
+        /// <summary>Ensure over an async Result pipeline with string error.</summary>
+        public async Task<Result<TValue>> Ensure(Func<TValue, bool> predicate, string errorMessage)
+        {
+            ArgumentNullException.ThrowIfNull(resultTask);
+
+            Result<TValue> result = await resultTask.ConfigureAwait(false);
+            return result.Ensure(predicate, errorMessage);
+        }
+
+        /// <summary>Ensure over an async Result pipeline with a lazy error factory.</summary>
+        public async Task<Result<TValue>> Ensure(Func<TValue, bool> predicate, Func<TValue, Error> errorFactory)
+        {
+            ArgumentNullException.ThrowIfNull(resultTask);
+
+            Result<TValue> result = await resultTask.ConfigureAwait(false);
+            return result.Ensure(predicate, errorFactory);
+        }
+
+        /// <summary>Match over an async Result pipeline.</summary>
+        public async Task<TOut> Match<TOut>(Func<TValue, TOut> onSuccess, Func<IReadOnlyList<Error>, TOut> onFailure)
+        {
+            ArgumentNullException.ThrowIfNull(resultTask);
+
+            Result<TValue> result = await resultTask.ConfigureAwait(false);
+            return result.Match(onSuccess, onFailure);
+        }
+
+        /// <summary>Async Match over an async Result pipeline.</summary>
+        public async Task<TOut> MatchAsync<TOut>(Func<TValue, Task<TOut>> onSuccess, Func<IReadOnlyList<Error>, Task<TOut>> onFailure)
+        {
+            ArgumentNullException.ThrowIfNull(resultTask);
+
+            Result<TValue> result = await resultTask.ConfigureAwait(false);
+            return await result.MatchAsync(onSuccess, onFailure).ConfigureAwait(false);
+        }
+
+        /// <summary>TapError over an async Result pipeline.</summary>
+        public async Task<Result<TValue>> TapError(Action<IReadOnlyList<Error>> action)
+        {
+            ArgumentNullException.ThrowIfNull(resultTask);
+
+            Result<TValue> result = await resultTask.ConfigureAwait(false);
+            return result.TapError(action);
+        }
+
+        /// <summary>TapError over an async Result pipeline with an async action.</summary>
+        public async Task<Result<TValue>> TapErrorAsync(Func<IReadOnlyList<Error>, Task> action)
+        {
+            ArgumentNullException.ThrowIfNull(resultTask);
+
+            Result<TValue> result = await resultTask.ConfigureAwait(false);
+            return await result.TapErrorAsync(action).ConfigureAwait(false);
+        }
+
+        /// <summary>Switch over an async Result pipeline.</summary>
+        public async Task Switch(Action<TValue> onSuccess, Action<IReadOnlyList<Error>> onFailure)
+        {
+            ArgumentNullException.ThrowIfNull(resultTask);
+
+            Result<TValue> result = await resultTask.ConfigureAwait(false);
+            result.Switch(onSuccess, onFailure);
+        }
+
+        /// <summary>SwitchAsync over an async Result pipeline.</summary>
+        public async Task SwitchAsync(Func<TValue, Task> onSuccess, Func<IReadOnlyList<Error>, Task> onFailure)
+        {
+            ArgumentNullException.ThrowIfNull(resultTask);
+
+            Result<TValue> result = await resultTask.ConfigureAwait(false);
+            await result.SwitchAsync(onSuccess, onFailure).ConfigureAwait(false);
+        }
+
+        /// <summary>Bind to non-generic Result over an async Result pipeline.</summary>
+        public async Task<Result> Bind(Func<TValue, Result> bind)
+        {
+            ArgumentNullException.ThrowIfNull(resultTask);
+
+            Result<TValue> result = await resultTask.ConfigureAwait(false);
+            return result.Bind(bind);
+        }
+
+        /// <summary>Async Bind to non-generic Result over an async Result pipeline.</summary>
+        public async Task<Result> BindAsync(Func<TValue, Task<Result>> bind)
+        {
+            ArgumentNullException.ThrowIfNull(resultTask);
+
+            Result<TValue> result = await resultTask.ConfigureAwait(false);
+            return await result.BindAsync(bind).ConfigureAwait(false);
+        }
+
+        /// <summary>Check if the awaited result contains an error of the specified type.</summary>
+        public async Task<bool> HasError<TError>() where TError : Error
+        {
+            ArgumentNullException.ThrowIfNull(resultTask);
+
+            Result<TValue> result = await resultTask.ConfigureAwait(false);
+            return result.HasError<TError>();
+        }
+
+        /// <summary>Check if the awaited result contains an error of the specified type matching a predicate.</summary>
+        public async Task<bool> HasError<TError>(Func<TError, bool> predicate) where TError : Error
+        {
+            ArgumentNullException.ThrowIfNull(resultTask);
+
+            Result<TValue> result = await resultTask.ConfigureAwait(false);
+            return result.HasError(predicate);
+        }
+
+        /// <summary>Check if the awaited result contains an error with the specified code.</summary>
+        public async Task<bool> HasErrorCode(string code)
+        {
+            ArgumentNullException.ThrowIfNull(resultTask);
+
+            Result<TValue> result = await resultTask.ConfigureAwait(false);
+            return result.HasErrorCode(code);
+        }
+
+        /// <summary>Check if the awaited result contains an error caused by the specified exception type.</summary>
+        public async Task<bool> HasException<TException>() where TException : Exception
+        {
+            ArgumentNullException.ThrowIfNull(resultTask);
+
+            Result<TValue> result = await resultTask.ConfigureAwait(false);
+            return result.HasException<TException>();
+        }
+    }
+
+    extension(Task<Result> resultTask)
+    {
+        /// <summary>Match over an async non-generic Result pipeline.</summary>
+        public async Task<TOut> Match<TOut>(Func<TOut> onSuccess,
+            Func<IReadOnlyList<Error>, TOut> onFailure)
+        {
+            ArgumentNullException.ThrowIfNull(resultTask);
+
+            Result result = await resultTask.ConfigureAwait(false);
+            return result.Match(onSuccess, onFailure);
+        }
+
+        /// <summary>Async Match over an async non-generic Result pipeline.</summary>
+        public async Task<TOut> MatchAsync<TOut>(
+            Func<Task<TOut>> onSuccess,
+            Func<IReadOnlyList<Error>, Task<TOut>> onFailure)
+        {
+            ArgumentNullException.ThrowIfNull(resultTask);
+
+            Result result = await resultTask.ConfigureAwait(false);
+            return await result.MatchAsync(onSuccess, onFailure).ConfigureAwait(false);
+        }
+
+        /// <summary>Bind over an async non-generic Result pipeline.</summary>
+        public async Task<Result> Bind(Func<Result> bind)
+        {
+            ArgumentNullException.ThrowIfNull(resultTask);
+
+            Result result = await resultTask.ConfigureAwait(false);
+            return result.Bind(bind);
+        }
+
+        /// <summary>Bind async over an async non-generic Result pipeline.</summary>
+        public async Task<Result> BindAsync(Func<Task<Result>> bind)
+        {
+            ArgumentNullException.ThrowIfNull(resultTask);
+
+            Result result = await resultTask.ConfigureAwait(false);
+            return await result.BindAsync(bind).ConfigureAwait(false);
+        }
+
+        /// <summary>Bind an async non-generic Result to a typed <see cref="Result{TValue}"/>.</summary>
+        public async Task<Result<TValue>> Bind<TValue>(Func<Result<TValue>> bind)
+        {
+            ArgumentNullException.ThrowIfNull(resultTask);
+
+            Result result = await resultTask.ConfigureAwait(false);
+            return result.Bind(bind);
+        }
+
+        /// <summary>Async bind an async non-generic Result to a typed <see cref="Result{TValue}"/>.</summary>
+        public async Task<Result<TValue>> BindAsync<TValue>(Func<Task<Result<TValue>>> bind)
+        {
+            ArgumentNullException.ThrowIfNull(resultTask);
+
+            Result result = await resultTask.ConfigureAwait(false);
+            return await result.BindAsync(bind).ConfigureAwait(false);
+        }
+
+        /// <summary>Tap over an async non-generic Result pipeline.</summary>
+        public async Task<Result> Tap(Action action)
+        {
+            ArgumentNullException.ThrowIfNull(resultTask);
+
+            Result result = await resultTask.ConfigureAwait(false);
+            return result.Tap(action);
+        }
+
+        /// <summary>Tap over an async non-generic Result pipeline with an async action.</summary>
+        public async Task<Result> TapAsync(Func<Task> action)
+        {
+            ArgumentNullException.ThrowIfNull(resultTask);
+
+            Result result = await resultTask.ConfigureAwait(false);
+            return await result.TapAsync(action).ConfigureAwait(false);
+        }
+
+        /// <summary>TapError over an async non-generic Result pipeline.</summary>
+        public async Task<Result> TapError(Action<IReadOnlyList<Error>> action)
+        {
+            ArgumentNullException.ThrowIfNull(resultTask);
+
+            Result result = await resultTask.ConfigureAwait(false);
+            return result.TapError(action);
+        }
+
+        /// <summary>TapError over an async non-generic Result pipeline with an async action.</summary>
+        public async Task<Result> TapErrorAsync(Func<IReadOnlyList<Error>, Task> action)
+        {
+            ArgumentNullException.ThrowIfNull(resultTask);
+
+            Result result = await resultTask.ConfigureAwait(false);
+            return await result.TapErrorAsync(action).ConfigureAwait(false);
+        }
+
+        /// <summary>Ensure over an async non-generic Result pipeline.</summary>
+        public async Task<Result> Ensure(Func<bool> predicate, Error error)
+        {
+            ArgumentNullException.ThrowIfNull(resultTask);
+
+            Result result = await resultTask.ConfigureAwait(false);
+            return result.Ensure(predicate, error);
+        }
+
+        /// <summary>Ensure over an async non-generic Result pipeline with a lazy error factory.</summary>
+        public async Task<Result> Ensure(Func<bool> predicate, Func<Error> errorFactory)
+        {
+            ArgumentNullException.ThrowIfNull(resultTask);
+
+            Result result = await resultTask.ConfigureAwait(false);
+            return result.Ensure(predicate, errorFactory);
+        }
+
+        /// <summary>Switch over an async non-generic Result pipeline.</summary>
+        public async Task Switch(Action onSuccess, Action<IReadOnlyList<Error>> onFailure)
+        {
+            ArgumentNullException.ThrowIfNull(resultTask);
+
+            Result result = await resultTask.ConfigureAwait(false);
+            result.Switch(onSuccess, onFailure);
+        }
+
+        /// <summary>SwitchAsync over an async non-generic Result pipeline.</summary>
+        public async Task SwitchAsync(Func<Task> onSuccess, Func<IReadOnlyList<Error>, Task> onFailure)
+        {
+            ArgumentNullException.ThrowIfNull(resultTask);
+
+            Result result = await resultTask.ConfigureAwait(false);
+            await result.SwitchAsync(onSuccess, onFailure).ConfigureAwait(false);
+        }
+
+        /// <summary>Check if the awaited result contains an error of the specified type.</summary>
+        public async Task<bool> HasError<TError>() where TError : Error
+        {
+            ArgumentNullException.ThrowIfNull(resultTask);
+
+            Result result = await resultTask.ConfigureAwait(false);
+            return result.HasError<TError>();
+        }
+
+        /// <summary>Check if the awaited result contains an error of the specified type matching a predicate.</summary>
+        public async Task<bool> HasError<TError>(Func<TError, bool> predicate) where TError : Error
+        {
+            ArgumentNullException.ThrowIfNull(resultTask);
+
+            Result result = await resultTask.ConfigureAwait(false);
+            return result.HasError(predicate);
+        }
+
+        /// <summary>Check if the awaited result contains an error with the specified code.</summary>
+        public async Task<bool> HasErrorCode(string code)
+        {
+            ArgumentNullException.ThrowIfNull(resultTask);
+
+            Result result = await resultTask.ConfigureAwait(false);
+            return result.HasErrorCode(code);
+        }
+
+        /// <summary>Check if the awaited result contains an error caused by the specified exception type.</summary>
+        public async Task<bool> HasException<TException>() where TException : Exception
+        {
+            ArgumentNullException.ThrowIfNull(resultTask);
+
+            Result result = await resultTask.ConfigureAwait(false);
+            return result.HasException<TException>();
+        }
+    }
+}
