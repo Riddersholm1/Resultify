@@ -9,12 +9,15 @@ on:
     types: [published]
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 permissions:
-  contents: read  # default; publish job overrides to write
+  contents: read
 
 env:
   DOTNET_VERSION: "10.0.x"
-  DOTNET_QUALITY: "preview"
   CONFIGURATION: Release
 
 jobs:
@@ -40,7 +43,6 @@ jobs:
         uses: actions/setup-dotnet@v5.2.0
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
-          dotnet-quality: ${{ env.DOTNET_QUALITY }}
 
       - name: Restore
         run: dotnet restore
@@ -86,9 +88,6 @@ jobs:
     needs: build-test-pack
     if: github.event_name == 'release' && github.event.action == 'published'
     runs-on: ubuntu-latest
-
-    permissions:
-      contents: write
 
     steps:
       - name: Download packages

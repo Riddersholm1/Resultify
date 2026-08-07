@@ -5,11 +5,13 @@
 		<Nullable>enable</Nullable>
 		<LangVersion>latest</LangVersion>
 		<GenerateDocumentationFile>true</GenerateDocumentationFile>
-		<DocumentationFile>bin\$(Configuration)\$(TargetFramework)\$(AssemblyName).xml</DocumentationFile>
-		<EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
 		<AnalysisLevel>latest-recommended</AnalysisLevel>
+		<!-- Match CI, which builds with -warnaserror, so a warning fails locally too. -->
+		<TreatWarningsAsErrors>true</TreatWarningsAsErrors>
 		<IsAotCompatible>true</IsAotCompatible>
 		<IsTrimmable>true</IsTrimmable>
+		<!-- Deterministic paths in the symbol package when building on a CI runner. -->
+		<ContinuousIntegrationBuild Condition="'$(GITHUB_ACTIONS)' == 'true'">true</ContinuousIntegrationBuild>
 
 		<!-- NuGet package metadata -->
 		<PackageId>Riddersholm.Resultify</PackageId>
@@ -40,9 +42,5 @@
 
 	<ItemGroup>
 		<PackageReference Include="Microsoft.SourceLink.GitHub" Version="10.0.300" PrivateAssets="All" />
-	</ItemGroup>
-
-	<ItemGroup>
-		<InternalsVisibleTo Include="Resultify.Tests" />
 	</ItemGroup>
 </Project>

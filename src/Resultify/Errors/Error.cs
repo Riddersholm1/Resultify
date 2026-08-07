@@ -45,10 +45,18 @@ public record Error
     /// Structured key-value metadata attached to this error.
     /// Use <see cref="WithMetadata(string, object)"/> to add entries — it returns a new instance.
     /// </summary>
-    public IReadOnlyDictionary<string, object> Metadata
+    /// <remarks>
+    /// Backed by an <see cref="ImmutableDictionary{TKey, TValue}"/>. The setter is private, so this
+    /// is the only representation the property can ever hold — entries cannot be added or replaced
+    /// through the exposed <see cref="IReadOnlyDictionary{TKey, TValue}"/>.
+    /// </remarks>
+    public IReadOnlyDictionary<string, object> Metadata => MetadataStore;
+
+    /// <summary>Strongly typed backing store for <see cref="Metadata"/>.</summary>
+    private ImmutableDictionary<string, object> MetadataStore
     {
         get;
-        private init
+        init
         {
             ArgumentNullException.ThrowIfNull(value);
             field = value;
@@ -102,8 +110,7 @@ public record Error
     {
         ArgumentNullException.ThrowIfNull(key);
         ArgumentNullException.ThrowIfNull(value);
-        ImmutableDictionary<string, object> current = Metadata as ImmutableDictionary<string, object> ?? Metadata.ToImmutableDictionary();
-        return this with { Metadata = current.SetItem(key, value) };
+        return this with { MetadataStore = MetadataStore.SetItem(key, value) };
     }
 
     /// <summary>Attach multiple metadata pairs. Returns a new instance.</summary>
@@ -113,8 +120,7 @@ public record Error
     public Error WithMetadata(IEnumerable<KeyValuePair<string, object>> metadata)
     {
         ArgumentNullException.ThrowIfNull(metadata);
-        ImmutableDictionary<string, object> current = Metadata as ImmutableDictionary<string, object> ?? Metadata.ToImmutableDictionary();
-        ImmutableDictionary<string, object>.Builder builder = current.ToBuilder();
+        ImmutableDictionary<string, object>.Builder builder = MetadataStore.ToBuilder();
         foreach (KeyValuePair<string, object> kvp in metadata)
         {
             if (kvp.Key is null)
@@ -125,7 +131,7 @@ public record Error
             builder[kvp.Key] = kvp.Value ?? throw new ArgumentException($"Metadata value for key '{kvp.Key}' must not be null.", nameof(metadata));
         }
 
-        return this with { Metadata = builder.ToImmutable() };
+        return this with { MetadataStore = builder.ToImmutable() };
     }
 
     /// <summary>Add a cause to the causal chain. Returns a new instance.</summary>
@@ -145,17 +151,19 @@ public record Error
     {
         ArgumentNullException.ThrowIfNull(causes);
         List<Error> combined = [.. Causes];
-        foreach (Error c in causes)
+        foreach (Error cause in causes)
         {
-            if (c is null)
+            if (cause is null)
             {
                 throw new ArgumentException("Cause elements must not be null.", nameof(causes));
             }
 
-            combined.Add(c);
+            combined.Add(cause);
         }
 
-        return this with { Causes = combined.ToArray() };
+        // A collection expression (rather than ToArray) so the result is a read-only view:
+        // callers must not be able to cast Causes back to Error[] and write through it.
+        return this with { Causes = [.. combined] };
     }
 
     /// <summary>Add an exception as a cause. Returns a new instance.</summary>
@@ -171,7 +179,20 @@ public record Error
     /// Returns a human-readable representation of the error, including its code (when present)
     /// and any causal chain. Intended for logs and debugging — not for end-user display.
     /// </summary>
-    public override string ToString()
+    /// <returns>
+    /// <c>"[Code] Message"</c>, or just <c>"Message"</c> when <see cref="Code"/> is empty,
+    /// followed by <c>" (caused by: …)"</c> when <see cref="Causes"/> is non-empty.
+    /// </returns>
+    /// <remarks>
+    /// Sealed deliberately. A <c>record</c> synthesises its own <c>ToString</c> unless the base
+    /// declares a sealed one, so without <c>sealed</c> every derived error — including the built-in
+    /// subtypes and any custom error a consumer writes — would silently fall back to the record
+    /// format (<c>"NotFoundError { Code = …, Metadata = System.Collections.Immutable… }"</c>) and
+    /// dump its whole state into logs. Sealing guarantees one stable log format for every
+    /// <see cref="Error"/>; carry extra detail in <see cref="Metadata"/> or <see cref="Causes"/>
+    /// rather than by overriding this method.
+    /// </remarks>
+    public sealed override string ToString()
     {
         string codePrefix = string.IsNullOrEmpty(Code) ? string.Empty : $"[{Code}] ";
         string causesSuffix = Causes.Count > 0 ? $" (caused by: {string.Join(", ", Causes)})" : string.Empty;
