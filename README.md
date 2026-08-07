@@ -189,8 +189,9 @@ var result = GetCustomer(id)
 
 ## Async pipelines
 
-Every combinator is also an extension method on `Task<Result<T>>`, so you can
-chain sync and async steps fluently without intermediate `await`s:
+Nearly every combinator is also an extension method on `Task<Result<T>>` and
+`Task<Result>`, so you can chain sync and async steps fluently without intermediate
+`await`s:
 
 ```csharp
 Result<OrderId> result = await GetCustomerAsync(id)
@@ -200,6 +201,26 @@ Result<OrderId> result = await GetCustomerAsync(id)
     .Tap(order       => logger.LogInformation("Order {Id} created", order.Id))
     .Map(order       => order.Id);
 ```
+
+Each helper awaits the antecedent task and delegates to the instance method of the
+same name, always with `ConfigureAwait(false)`, so behaviour matches the synchronous
+form exactly. Two gaps are worth knowing:
+
+- **Three instance members have no task-based counterpart**: `Ensure(predicate, string)`
+  on `Task<Result>`, `ToResult<T>(value)` on `Task<Result>`, and `ToResult()` on
+  `Task<Result<T>>`. Await first: `(await pipeline).ToResult()`.
+- **On a `Task<Result<T>>` receiver, members that need an explicit type argument can't
+  be called fluently.** The extension block contributes its own type parameter and C#
+  won't infer only some of them, so `pipeline.HasError<ValidationError>()` fails to
+  compile (CS1929). Either await first — `(await pipeline).HasError<ValidationError>()` —
+  or let inference do the work by typing the lambda:
+  `pipeline.HasError((ValidationError e) => e.PropertyName == "Email")`.
+  `HasErrorCode` takes no type argument and works everywhere, as do all of these on a
+  `Task<Result>` receiver.
+
+Null arguments are rejected with `ArgumentNullException` throughout. On `async` members
+that surfaces as a faulted task rather than a synchronous throw — same exception, same
+parameter name, observed as soon as you await.
 
 ## Try — catch exceptions as errors
 
@@ -288,6 +309,44 @@ Result         r = new Error("fail"); // Failure
 Result<int>    r = new Error("fail"); // Failure
 ```
 
+`Result<T>` declares conversions from both `T` and `Error`, which overlap for some
+type arguments:
+
+```csharp
+Result<object> r = new Error("fail"); // Failure — the Error conversion is more specific and wins
+Result<Error>  r = new Error("fail"); // Does not compile: CS0457, ambiguous user defined conversions
+```
+
+For `Result<Error>` — and for storing an error *as a value* in a `Result<object>` —
+use the explicit factories: `Result<Error>.Success(error)`, `Result<Error>.Failure(error)`.
+
+## Equality
+
+`Result` and `Result<T>` implement `IEquatable<T>` and the `==` / `!=` operators, so
+they compare by value and work as dictionary keys:
+
+- All successes of `Result` are equal to each other.
+- Two `Result<T>` successes are equal when their values are (via `EqualityComparer<T>.Default`).
+- Two failures are equal when their error sequences are equal, in order.
+
+`Error` is a record with value equality that also accounts for `Metadata` and `Causes`.
+Equality is type-sensitive: a `NotFoundError` never equals a plain `Error` with the same
+code and message. `ExceptionalError` additionally requires the *same exception instance*,
+since two exceptions with equal messages are not interchangeable.
+
+## Logging
+
+`Error.ToString()` renders as `[Code] Message`, with ` (caused by: …)` appended when the
+error has causes. It is **sealed**, so every error — the built-in subtypes and your own —
+renders the same way; without that, each derived `record` would substitute the compiler's
+generated format and dump `Metadata`, `Causes` and entire exception stack traces into your
+logs. Carry extra detail in `Metadata` rather than by overriding `ToString`.
+
+```csharp
+Result.Failure(new NotFoundError("Customer", 42)).ToString();
+// Result: Failure ([Customer.NotFound] Customer with id '42' was not found.)
+```
+
 ## Thread safety
 
 `Result`, `Result<T>`, `Error`, and all built-in error subtypes are **immutable**.
@@ -296,8 +355,10 @@ Instances can be shared across threads without any synchronization:
 - `Result` / `Result<T>` are `readonly struct` — fields cannot change after construction.
 - `Error.Code`, `Error.Message`, `Error.Metadata`, and `Error.Causes` are init-only.
   `WithMetadata` / `CausedBy` return *new* instances rather than mutating.
-- The internal `Errors` list is stored as a defensively-copied `Error[]`,
-  so external mutation of the source never affects the result.
+- The `Errors` list is a defensive copy exposed through a read-only view, so neither
+  mutating the collection you passed to `Failure(...)` nor casting `.Errors` back to
+  `Error[]` can change a result after construction. Since results are structs, every
+  copy shares that one list — which is exactly why it must be unwritable.
 - Successful results share a single empty `IReadOnlyList<Error>` instance — reading
   `.Errors` on a success never allocates and is safe under concurrent readers.
 
@@ -328,12 +389,21 @@ zero-alloc, which matters in tight loops and high-throughput handlers.
 
 **What happens with `default(Result<string>)`?**
 Because `Result<T>` is a `readonly struct`, the runtime can produce `default`
-instances. A `default(Result<string>)` reports `IsSuccess = true` and
-`ValueOrDefault = null`, but accessing `.Value` throws
-`InvalidOperationException`. Prefer the factory methods (`Success`, `Failure`,
-`Create`) and avoid `default`. For exception-free access on the read side, use
-`TryGetValue(out T value)` — it returns `false` for both failures and
-`default(Result<T>)` with a null value.
+instances that no factory validated — an uninitialised field, an array element, a
+`default` switch arm. Such a value carries no errors, so it reports
+`IsSuccess = true`, and what happens next depends on `T`:
+
+- For a value type, `default(Result<int>)` is a success carrying `0` — a legitimate
+  value, and it flows through every combinator normally.
+- For a reference type, `default(Result<string>)` has a null value. The factories
+  guarantee a success is never null, so rather than hand you a null the library fails
+  loudly: `.Value` throws `InvalidOperationException`, and so does any combinator that
+  passes the value to your callback (`Map`, `Bind`, `Tap`, `Ensure`, `Match`, `Switch`,
+  and `Merge` over a sequence containing one).
+
+Prefer the factory methods (`Success`, `Failure`, `Create`) and never hand out
+`default`. On the read side, `TryGetValue(out T value)` and `ValueOrDefault` are total
+— neither throws for any state, including `default`.
 
 **Why no `IResult` interface?**
 An interface would box the struct, defeating the zero-allocation goal.

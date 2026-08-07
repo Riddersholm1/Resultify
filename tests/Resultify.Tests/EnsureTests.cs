@@ -98,3 +98,42 @@ public sealed class ResultTEnsureLazyFactoryTests
         Assert.False(called);
     }
 }
+
+/// <summary>Ensure reached through a <c>Task&lt;Result&gt;</c> receiver.</summary>
+public sealed class AsyncEnsureTests
+{
+    [Fact]
+    public async Task Ensure_OnAsyncResult_WithLazyFactory_ShouldNotInvokeFactoryOnPass()
+    {
+        var called = false;
+        Result result = await Task.FromResult(Result.Success())
+            .Ensure(() => true, () =>
+            {
+                called = true;
+                return new Error("never");
+            });
+
+        Assert.True(result.IsSuccess);
+        Assert.False(called);
+    }
+
+    [Fact]
+    public async Task Ensure_OnAsyncResult_WithLazyFactory_ShouldInvokeFactoryOnFail()
+    {
+        Result result = await Task.FromResult(Result.Success())
+            .Ensure(() => false, () => new Error("lazy fail"));
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("lazy fail", result.FirstError.Message);
+    }
+
+    [Fact]
+    public async Task Ensure_OnAsyncResult_WithError_ShouldGate()
+    {
+        Result result = await Task.FromResult(Result.Success())
+            .Ensure(() => false, new Error("gated"));
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("gated", result.FirstError.Message);
+    }
+}

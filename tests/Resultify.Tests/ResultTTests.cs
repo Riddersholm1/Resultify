@@ -197,3 +197,42 @@ public sealed class ResultTTests
         Assert.Empty(errors);
     }
 }
+
+/// <summary>
+/// Small corners the broader suites do not reach: the non-generic helper that builds a typed
+/// success, the already-failed short circuit in Ensure's Error overload, and cancellation through
+/// the Result&lt;T&gt;-returning async Try.
+/// </summary>
+public sealed class RemainingCoverageTests
+{
+    [Fact]
+    public void Result_SuccessOfT_ShouldBuildATypedSuccess()
+    {
+        Result<int> result = Result.Success(42);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(42, result.Value);
+    }
+
+    [Fact]
+    public void Result_SuccessOfT_WithAReferenceValue_ShouldBuildATypedSuccess() =>
+        Assert.Equal("hello", Result.Success("hello").Value);
+
+    [Fact]
+    public void ResultT_Ensure_WithError_OnAnAlreadyFailedResult_ShouldNotEvaluateThePredicate()
+    {
+        var evaluated = false;
+
+        Result<int> result = Result<int>.Failure("earlier").Ensure(
+            _ => { evaluated = true; return true; },
+            new Error("later"));
+
+        Assert.False(evaluated);
+        Assert.Equal("earlier", result.FirstError.Message);
+    }
+
+    [Fact]
+    public async Task ResultT_TryAsync_ReturningResult_WhenCanceled_ShouldRethrow() =>
+        await Assert.ThrowsAsync<OperationCanceledException>(() =>
+            Result<int>.TryAsync((Func<Task<Result<int>>>)(() => throw new OperationCanceledException())));
+}
