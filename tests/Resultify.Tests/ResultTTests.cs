@@ -80,25 +80,6 @@ public sealed class ResultTTests
         Assert.Equal(Error.NullValue, result.FirstError);
     }
 
-    // ── Try ──────────────────────────────────────────────────
-
-    [Fact]
-    public void Try_WhenNoException_ShouldReturnValue()
-    {
-        Result<int> result = Result<int>.Try(() => 42);
-
-        Assert.True(result.IsSuccess);
-        Assert.Equal(42, result.Value);
-    }
-
-    [Fact]
-    public void Try_WhenException_ShouldFail()
-    {
-        Result<int> result = Result<int>.Try(() => throw new Exception("boom"));
-
-        Assert.True(result.IsFailure);
-    }
-
     // ── Map / Bind ───────────────────────────────────────────
 
     [Fact]

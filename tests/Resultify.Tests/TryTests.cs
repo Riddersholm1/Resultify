@@ -369,6 +369,11 @@ public sealed class TryCancellationTests
             Result.TryAsync(Canceling.FuncTask));
 
     [Fact]
+    public async Task TryAsync_ReturningResult_WhenOperationCanceled_ShouldRethrow() =>
+        await Assert.ThrowsAsync<OperationCanceledException>(() =>
+            Result.TryAsync(Canceling.FuncTaskOfResult));
+
+    [Fact]
     public async Task TryAsyncT_WhenOperationCanceled_ShouldRethrow() =>
         await Assert.ThrowsAsync<OperationCanceledException>(() =>
             Result<int>.TryAsync(Canceling.FuncTaskOfInt));

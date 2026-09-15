@@ -50,6 +50,8 @@ internal static class Canceling
 
     internal static Task FuncTask() => throw new OperationCanceledException();
 
+    internal static Task<Result> FuncTaskOfResult() => throw new OperationCanceledException();
+
     internal static Task<int> FuncTaskOfInt() => throw new OperationCanceledException();
 
     internal static Task<Result<int>> FuncTaskOfResultOfInt() => throw new OperationCanceledException();

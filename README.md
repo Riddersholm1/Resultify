@@ -30,6 +30,42 @@ A modern, **immutable** Result pattern library for **.NET 10**.
 dotnet add package Riddersholm.Resultify
 ```
 
+## Upgrading from 1.x
+
+The public API is unchanged — no member was added, removed or re-signed — but three
+behaviours changed. All three are fixes, and all three can be observed by existing
+code, so this is a major version.
+
+**1. `Error.ToString()` is now `sealed`.** A `record` synthesises its own `ToString()`
+unless the base declares a sealed one, so in 1.x every built-in error subtype silently
+replaced the `[Code] Message` format with the generated record dump — including
+`Metadata`, `Causes` and, for `ExceptionalError`, a full exception with stack trace.
+Sealing fixes all of them at once and extends the guarantee to your own error records.
+
+```csharp
+// 1.x
+Result.Failure(new NotFoundError("Customer", 42)).ToString();
+// Result: Failure (NotFoundError { Code = Customer.NotFound, Message = ...,
+//   Metadata = System.Collections.Immutable.ImmutableDictionary`2[...], ... })
+
+// 2.0
+// Result: Failure ([Customer.NotFound] Customer with id '42' was not found.)
+```
+
+If you override `ToString()` on a custom error type, that no longer compiles
+(`CS0239`) and an assembly compiled against 1.x will fail to load the type. Put the
+extra detail in `Metadata` or `Causes` instead — both are included in the output.
+
+**2. Log output changed for the five built-in error types.** Anything asserting on or
+parsing those strings needs updating. Match on `Code` rather than message text.
+
+**3. `Errors` is no longer castable to `Error[]`.** It was always typed
+`IReadOnlyList<Error>`, but multi-error failures were backed by a raw array, so
+`((Error[])result.Errors)[0] = ...` silently rewrote a result the README calls
+immutable — and since `Result` is a struct, every copy shares that one list. The list
+is now a read-only view; that cast throws `InvalidCastException`. Copy it if you need
+a mutable collection: `result.Errors.ToArray()`.
+
 ## Quick start
 
 ```csharp

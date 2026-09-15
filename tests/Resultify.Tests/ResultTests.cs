@@ -76,33 +76,6 @@ public sealed class ResultTests
         Assert.True(result.IsSuccess);
     }
 
-    // ── Try ──────────────────────────────────────────────────
-
-    [Fact]
-    public void Try_WhenNoException_ShouldSucceed()
-    {
-        Result result = Result.Try(() => { });
-
-        Assert.True(result.IsSuccess);
-    }
-
-    [Fact]
-    public void Try_WhenException_ShouldFail()
-    {
-        Result result = Result.Try(() => throw new InvalidOperationException("boom"));
-
-        Assert.True(result.IsFailure);
-        Assert.IsType<ExceptionalError>(result.FirstError);
-    }
-
-    [Fact]
-    public void Try_ExceptionCode_ShouldBeExceptionName()
-    {
-        Result result = Result.Try(() => throw new InvalidOperationException("boom"));
-
-        Assert.Equal("Exception.InvalidOperationException", result.FirstError.Code);
-    }
-
     // ── Bind ─────────────────────────────────────────────────
 
     [Fact]
