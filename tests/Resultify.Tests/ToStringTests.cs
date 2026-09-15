@@ -89,6 +89,12 @@ public sealed class ErrorToStringTests
 
         Assert.StartsWith("[Payment.InsufficientFunds] ", error.ToString(), StringComparison.Ordinal);
         Assert.DoesNotContain("Metadata", error.ToString(), StringComparison.Ordinal);
+
+        // The subtype's own payload stays readable; only the rendering is inherited.
+        Assert.Equal(100m, error.Required);
+        Assert.Equal(25m, error.Available);
+        Assert.Contains("100", error.Message, StringComparison.Ordinal);
+        Assert.Contains("25", error.Message, StringComparison.Ordinal);
     }
 
     /// <summary>Mirrors the "Custom error types" example in the README.</summary>

@@ -49,8 +49,8 @@ public sealed class ValidationErrorTests
         var validation = new ValidationError("Email", "Required");
         var plain = new Error(validation.Code, validation.Message);
 
-        Assert.NotEqual<Error>(validation, plain);
-        Assert.NotEqual<Error>(plain, validation);
+        Assert.NotEqual(validation, plain);
+        Assert.NotEqual(plain, validation);
     }
 }
 
@@ -110,8 +110,8 @@ public sealed class NotFoundErrorTests
         var notFound = new NotFoundError("Customer", 42);
         var plain = new Error(notFound.Code, notFound.Message);
 
-        Assert.NotEqual<Error>(notFound, plain);
-        Assert.NotEqual<Error>(plain, notFound);
+        Assert.NotEqual(notFound, plain);
+        Assert.NotEqual(plain, notFound);
     }
 }
 
@@ -248,6 +248,9 @@ public sealed class ExceptionalErrorNullMessageTests
         public override string Message => null!;
     }
 
+    /// <summary>Pins the <c>Action</c> overload of <c>Try</c>; see <see cref="Throwing"/>.</summary>
+    private static void ThrowNullMessage() => throw new NullMessageException();
+
     [Fact]
     public void ExceptionalError_WithNullMessageException_ShouldCoerceToEmpty()
     {
@@ -263,7 +266,7 @@ public sealed class ExceptionalErrorNullMessageTests
     [Fact]
     public void Try_WhenThrowingNullMessageException_ShouldNotThrow()
     {
-        Result result = Result.Try((Action)(() => throw new NullMessageException()));
+        Result result = Result.Try(ThrowNullMessage);
 
         Assert.True(result.IsFailure);
         Assert.IsType<ExceptionalError>(result.FirstError);

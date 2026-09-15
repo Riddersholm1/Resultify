@@ -87,7 +87,9 @@ public sealed class ResultEqualityTests
     [Fact]
     public void Equals_Object_WithUnrelatedType_ShouldBeFalse()
     {
-        Assert.False(Result.Success().Equals("not a result"));
+        object unrelated = "not a result";
+
+        Assert.False(Result.Success().Equals(unrelated));
         Assert.False(Result.Success().Equals((object?)null));
     }
 
@@ -204,7 +206,9 @@ public sealed class ResultTEqualityTests
     [Fact]
     public void Equals_Object_WithUnrelatedType_ShouldBeFalse()
     {
-        Assert.False(Result<int>.Success(1).Equals("not a result"));
+        object unrelated = "not a result";
+
+        Assert.False(Result<int>.Success(1).Equals(unrelated));
         Assert.False(Result<int>.Success(1).Equals((object?)null));
     }
 

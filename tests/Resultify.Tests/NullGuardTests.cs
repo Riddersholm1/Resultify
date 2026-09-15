@@ -12,38 +12,38 @@ public sealed class FactoryNullGuardTests
 {
     public static TheoryData<string, Action> Cases() => new()
     {
-        { "Result.Failure(Error)", () => Result.Failure((Error)null!) },
-        { "Result.Failure(string)", () => Result.Failure((string)null!) },
+        { "Result.Failure(Error)", () => Result.Failure(Null.Of<Error>()) },
+        { "Result.Failure(string)", () => Result.Failure(Null.Of<string>()) },
         { "Result.Failure(null, message)", () => Result.Failure(null!, "message") },
         { "Result.Failure(code, null)", () => Result.Failure("code", null!) },
-        { "Result.Failure(IEnumerable)", () => Result.Failure((IEnumerable<Error>)null!) },
-        { "Result.Failure<T>(Error)", () => Result.Failure<int>((Error)null!) },
-        { "Result.Failure<T>(string)", () => Result.Failure<int>((string)null!) },
+        { "Result.Failure(IEnumerable)", () => Result.Failure(Null.Of<IEnumerable<Error>>()) },
+        { "Result.Failure<T>(Error)", () => Result.Failure<int>(Null.Of<Error>()) },
+        { "Result.Failure<T>(string)", () => Result.Failure<int>(Null.Of<string>()) },
         { "Result<T>.Success(null)", () => Result<string>.Success(null!) },
-        { "Result<T>.Failure(Error)", () => Result<int>.Failure((Error)null!) },
-        { "Result<T>.Failure(string)", () => Result<int>.Failure((string)null!) },
+        { "Result<T>.Failure(Error)", () => Result<int>.Failure(Null.Of<Error>()) },
+        { "Result<T>.Failure(string)", () => Result<int>.Failure(Null.Of<string>()) },
         { "Result<T>.Failure(null, message)", () => Result<int>.Failure(null!, "message") },
         { "Result<T>.Failure(code, null)", () => Result<int>.Failure("code", null!) },
-        { "Result<T>.Failure(IEnumerable)", () => Result<int>.Failure((IEnumerable<Error>)null!) },
-        { "Result.SuccessIf(false, Error)", () => Result.SuccessIf(false, (Error)null!) },
-        { "Result.SuccessIf(false, string)", () => Result.SuccessIf(false, (string)null!) },
-        { "Result.SuccessIf(_, factory)", () => Result.SuccessIf(true, (Func<Error>)null!) },
-        { "Result.FailureIf(true, Error)", () => Result.FailureIf(true, (Error)null!) },
-        { "Result.FailureIf(true, string)", () => Result.FailureIf(true, (string)null!) },
-        { "Result.FailureIf(_, factory)", () => Result.FailureIf(false, (Func<Error>)null!) },
-        { "Result<T>.SuccessIf(false, v, Error)", () => Result<int>.SuccessIf(false, 1, (Error)null!) },
+        { "Result<T>.Failure(IEnumerable)", () => Result<int>.Failure(Null.Of<IEnumerable<Error>>()) },
+        { "Result.SuccessIf(false, Error)", () => Result.SuccessIf(false, Null.Of<Error>()) },
+        { "Result.SuccessIf(false, string)", () => Result.SuccessIf(false, Null.Of<string>()) },
+        { "Result.SuccessIf(_, factory)", () => Result.SuccessIf(true, Null.Of<Func<Error>>()) },
+        { "Result.FailureIf(true, Error)", () => Result.FailureIf(true, Null.Of<Error>()) },
+        { "Result.FailureIf(true, string)", () => Result.FailureIf(true, Null.Of<string>()) },
+        { "Result.FailureIf(_, factory)", () => Result.FailureIf(false, Null.Of<Func<Error>>()) },
+        { "Result<T>.SuccessIf(false, v, Error)", () => Result<int>.SuccessIf(false, 1, Null.Of<Error>()) },
         { "Result<T>.SuccessIf(true, null, Error)", () => Result<string>.SuccessIf(true, null!, new Error("e")) },
-        { "Result<T>.SuccessIf(_, v, factory)", () => Result<int>.SuccessIf(true, 1, (Func<Error>)null!) },
-        { "Result<T>.FailureIf(true, v, Error)", () => Result<int>.FailureIf(true, 1, (Error)null!) },
+        { "Result<T>.SuccessIf(_, v, factory)", () => Result<int>.SuccessIf(true, 1, Null.Of<Func<Error>>()) },
+        { "Result<T>.FailureIf(true, v, Error)", () => Result<int>.FailureIf(true, 1, Null.Of<Error>()) },
         { "Result<T>.FailureIf(false, null, Error)", () => Result<string>.FailureIf(false, null!, new Error("e")) },
-        { "Result<T>.FailureIf(_, v, factory)", () => Result<int>.FailureIf(false, 1, (Func<Error>)null!) },
+        { "Result<T>.FailureIf(_, v, factory)", () => Result<int>.FailureIf(false, 1, Null.Of<Func<Error>>()) },
         { "Result.ToResult<T>(null)", () => Result.Success().ToResult<string>(null!) },
-        { "Result.Try(Action)", () => Result.Try((Action)null!) },
-        { "Result.Try(Func<Result>)", () => Result.Try((Func<Result>)null!) },
-        { "Result<T>.Try(Func<T>)", () => Result<int>.Try((Func<int>)null!) },
-        { "Result<T>.Try(Func<Result<T>>)", () => Result<int>.Try((Func<Result<int>>)null!) },
-        { "implicit Error -> Result", () => { Result _ = (Error)null!; } },
-        { "implicit Error -> Result<T>", () => { Result<int> _ = (Error)null!; } },
+        { "Result.Try(Action)", () => Result.Try(Null.Of<Action>()) },
+        { "Result.Try(Func<Result>)", () => Result.Try(Null.Of<Func<Result>>()) },
+        { "Result<T>.Try(Func<T>)", () => Result<int>.Try(Null.Of<Func<int>>()) },
+        { "Result<T>.Try(Func<Result<T>>)", () => Result<int>.Try(Null.Of<Func<Result<int>>>()) },
+        { "implicit Error -> Result", () => { Result _ = Null.Of<Error>(); } },
+        { "implicit Error -> Result<T>", () => { Result<int> _ = Null.Of<Error>(); } },
     };
 
     [Theory]
@@ -61,45 +61,45 @@ public sealed class CombinatorNullGuardTests
 
     public static TheoryData<string, Action> Cases() => new()
     {
-        { "Result.Bind", () => Success.Bind((Func<Result>)null!) },
-        { "Result.Bind<T>", () => Success.Bind((Func<Result<int>>)null!) },
-        { "Result.BindAsync", () => Success.BindAsync((Func<Task<Result>>)null!) },
-        { "Result.BindAsync<T>", () => Success.BindAsync((Func<Task<Result<int>>>)null!) },
+        { "Result.Bind", () => Success.Bind(Null.Of<Func<Result>>()) },
+        { "Result.Bind<T>", () => Success.Bind(Null.Of<Func<Result<int>>>()) },
+        { "Result.BindAsync", () => Success.BindAsync(Null.Of<Func<Task<Result>>>()) },
+        { "Result.BindAsync<T>", () => Success.BindAsync(Null.Of<Func<Task<Result<int>>>>()) },
         { "Result.Tap", () => Success.Tap(null!) },
         { "Result.TapError", () => Failed.TapError(null!) },
         { "Result.Ensure(predicate, Error)", () => Success.Ensure(null!, new Error("x")) },
-        { "Result.Ensure(_, null Error)", () => Success.Ensure(() => true, (Error)null!) },
-        { "Result.Ensure(_, null factory)", () => Success.Ensure(() => true, (Func<Error>)null!) },
-        { "Result.Ensure(_, null message)", () => Success.Ensure(() => true, (string)null!) },
-        { "Result.Match(null, _)", () => Success.Match<int>(null!, _ => 0) },
+        { "Result.Ensure(_, null Error)", () => Success.Ensure(() => true, Null.Of<Error>()) },
+        { "Result.Ensure(_, null factory)", () => Success.Ensure(() => true, Null.Of<Func<Error>>()) },
+        { "Result.Ensure(_, null message)", () => Success.Ensure(() => true, Null.Of<string>()) },
+        { "Result.Match(null, _)", () => Success.Match(Null.Of<Func<int>>(), _ => 0) },
         { "Result.Match(_, null)", () => Success.Match(() => 0, null!) },
-        { "Result.MatchAsync(null, _)", () => Success.MatchAsync<int>(null!, _ => Task.FromResult(0)) },
+        { "Result.MatchAsync(null, _)", () => Success.MatchAsync(Null.Of<Func<Task<int>>>(), _ => Task.FromResult(0)) },
         { "Result.MatchAsync(_, null)", () => Success.MatchAsync(() => Task.FromResult(0), null!) },
         { "Result.Switch(null, _)", () => Success.Switch(null!, _ => { }) },
         { "Result.Switch(_, null)", () => Success.Switch(() => { }, null!) },
         { "Result.HasError(null)", () => Success.HasError<Error>(null!) },
 
         { "Result<T>.Map", () => TypedSuccess.Map<int>(null!) },
-        { "Result<T>.Bind<TNew>", () => TypedSuccess.Bind((Func<int, Result<int>>)null!) },
-        { "Result<T>.Bind(Result)", () => TypedSuccess.Bind((Func<int, Result>)null!) },
-        { "Result<T>.BindAsync<TNew>", () => TypedSuccess.BindAsync((Func<int, Task<Result<int>>>)null!) },
-        { "Result<T>.BindAsync(Result)", () => TypedSuccess.BindAsync((Func<int, Task<Result>>)null!) },
+        { "Result<T>.Bind<TNew>", () => TypedSuccess.Bind(Null.Of<Func<int, Result<int>>>()) },
+        { "Result<T>.Bind(Result)", () => TypedSuccess.Bind(Null.Of<Func<int, Result>>()) },
+        { "Result<T>.BindAsync<TNew>", () => TypedSuccess.BindAsync(Null.Of<Func<int, Task<Result<int>>>>()) },
+        { "Result<T>.BindAsync(Result)", () => TypedSuccess.BindAsync(Null.Of<Func<int, Task<Result>>>()) },
         { "Result<T>.Tap", () => TypedSuccess.Tap(null!) },
         { "Result<T>.TapError", () => TypedFailed.TapError(null!) },
         { "Result<T>.Ensure(predicate, Error)", () => TypedSuccess.Ensure(null!, new Error("x")) },
-        { "Result<T>.Ensure(_, null Error)", () => TypedSuccess.Ensure(_ => true, (Error)null!) },
-        { "Result<T>.Ensure(_, null factory)", () => TypedSuccess.Ensure(_ => true, (Func<int, Error>)null!) },
-        { "Result<T>.Ensure(_, null message)", () => TypedSuccess.Ensure(_ => true, (string)null!) },
-        { "Result<T>.Match(null, _)", () => TypedSuccess.Match<int>(null!, _ => 0) },
+        { "Result<T>.Ensure(_, null Error)", () => TypedSuccess.Ensure(_ => true, Null.Of<Error>()) },
+        { "Result<T>.Ensure(_, null factory)", () => TypedSuccess.Ensure(_ => true, Null.Of<Func<int, Error>>()) },
+        { "Result<T>.Ensure(_, null message)", () => TypedSuccess.Ensure(_ => true, Null.Of<string>()) },
+        { "Result<T>.Match(null, _)", () => TypedSuccess.Match(Null.Of<Func<int, int>>(), _ => 0) },
         { "Result<T>.Match(_, null)", () => TypedSuccess.Match(_ => 0, null!) },
-        { "Result<T>.MatchAsync(null, _)", () => TypedSuccess.MatchAsync<int>(null!, _ => Task.FromResult(0)) },
+        { "Result<T>.MatchAsync(null, _)", () => TypedSuccess.MatchAsync(Null.Of<Func<int, Task<int>>>(), _ => Task.FromResult(0)) },
         { "Result<T>.MatchAsync(_, null)", () => TypedSuccess.MatchAsync(_ => Task.FromResult(0), null!) },
         { "Result<T>.Switch(null, _)", () => TypedSuccess.Switch(null!, _ => { }) },
         { "Result<T>.Switch(_, null)", () => TypedSuccess.Switch(_ => { }, null!) },
         { "Result<T>.HasError(null)", () => TypedSuccess.HasError<Error>(null!) },
 
-        { "Merge(null IEnumerable<Result>)", () => ((IEnumerable<Result>)null!).Merge() },
-        { "Merge(null IEnumerable<Result<T>>)", () => ((IEnumerable<Result<int>>)null!).Merge() },
+        { "Merge(null IEnumerable<Result>)", () => Null.Of<IEnumerable<Result>>().Merge() },
+        { "Merge(null IEnumerable<Result<T>>)", () => Null.Of<IEnumerable<Result<int>>>().Merge() },
     };
 
     /// <summary>
@@ -149,51 +149,51 @@ public sealed class AsyncPipelineNullGuardTests
 {
     public static TheoryData<string, Func<Task>> TypedCases() => new()
     {
-        { "Map", () => ((Task<Result<int>>)null!).Map(v => v) },
-        { "MapAsync", () => ((Task<Result<int>>)null!).MapAsync(v => Task.FromResult(v)) },
-        { "Bind", () => ((Task<Result<int>>)null!).Bind(Result<int>.Success) },
-        { "BindAsync", () => ((Task<Result<int>>)null!).BindAsync(v => Task.FromResult(Result<int>.Success(v))) },
-        { "Bind to Result", () => ((Task<Result<int>>)null!).Bind(_ => Result.Success()) },
-        { "BindAsync to Result", () => ((Task<Result<int>>)null!).BindAsync(_ => Task.FromResult(Result.Success())) },
-        { "Tap", () => ((Task<Result<int>>)null!).Tap(_ => { }) },
-        { "TapAsync", () => ((Task<Result<int>>)null!).TapAsync(_ => Task.CompletedTask) },
-        { "TapError", () => ((Task<Result<int>>)null!).TapError(_ => { }) },
-        { "TapErrorAsync", () => ((Task<Result<int>>)null!).TapErrorAsync(_ => Task.CompletedTask) },
-        { "Ensure(Error)", () => ((Task<Result<int>>)null!).Ensure(_ => true, new Error("x")) },
-        { "Ensure(string)", () => ((Task<Result<int>>)null!).Ensure(_ => true, "x") },
-        { "Ensure(factory)", () => ((Task<Result<int>>)null!).Ensure(_ => true, _ => new Error("x")) },
-        { "Match", () => ((Task<Result<int>>)null!).Match(_ => 0, _ => 0) },
-        { "MatchAsync", () => ((Task<Result<int>>)null!).MatchAsync(_ => Task.FromResult(0), _ => Task.FromResult(0)) },
-        { "Switch", () => ((Task<Result<int>>)null!).Switch(_ => { }, _ => { }) },
-        { "SwitchAsync", () => ((Task<Result<int>>)null!).SwitchAsync(_ => Task.CompletedTask, _ => Task.CompletedTask) },
+        { "Map", () => Null.Of<Task<Result<int>>>().Map(v => v) },
+        { "MapAsync", () => Null.Of<Task<Result<int>>>().MapAsync(v => Task.FromResult(v)) },
+        { "Bind", () => Null.Of<Task<Result<int>>>().Bind(Result<int>.Success) },
+        { "BindAsync", () => Null.Of<Task<Result<int>>>().BindAsync(v => Task.FromResult(Result<int>.Success(v))) },
+        { "Bind to Result", () => Null.Of<Task<Result<int>>>().Bind(_ => Result.Success()) },
+        { "BindAsync to Result", () => Null.Of<Task<Result<int>>>().BindAsync(_ => Task.FromResult(Result.Success())) },
+        { "Tap", () => Null.Of<Task<Result<int>>>().Tap(_ => { }) },
+        { "TapAsync", () => Null.Of<Task<Result<int>>>().TapAsync(_ => Task.CompletedTask) },
+        { "TapError", () => Null.Of<Task<Result<int>>>().TapError(_ => { }) },
+        { "TapErrorAsync", () => Null.Of<Task<Result<int>>>().TapErrorAsync(_ => Task.CompletedTask) },
+        { "Ensure(Error)", () => Null.Of<Task<Result<int>>>().Ensure(_ => true, new Error("x")) },
+        { "Ensure(string)", () => Null.Of<Task<Result<int>>>().Ensure(_ => true, "x") },
+        { "Ensure(factory)", () => Null.Of<Task<Result<int>>>().Ensure(_ => true, _ => new Error("x")) },
+        { "Match", () => Null.Of<Task<Result<int>>>().Match(_ => 0, _ => 0) },
+        { "MatchAsync", () => Null.Of<Task<Result<int>>>().MatchAsync(_ => Task.FromResult(0), _ => Task.FromResult(0)) },
+        { "Switch", () => Null.Of<Task<Result<int>>>().Switch(_ => { }, _ => { }) },
+        { "SwitchAsync", () => Null.Of<Task<Result<int>>>().SwitchAsync(_ => Task.CompletedTask, _ => Task.CompletedTask) },
         // HasError<TError>() and HasException<TException>() need the static call form on this
         // receiver — see the remarks on ResultExtensions.
         { "HasError", () => ResultExtensions.HasError<int, Error>(null!) },
-        { "HasError(predicate)", () => ((Task<Result<int>>)null!).HasError((Error _) => true) },
-        { "HasErrorCode", () => ((Task<Result<int>>)null!).HasErrorCode("x") },
+        { "HasError(predicate)", () => Null.Of<Task<Result<int>>>().HasError((Error _) => true) },
+        { "HasErrorCode", () => Null.Of<Task<Result<int>>>().HasErrorCode("x") },
         { "HasException", () => ResultExtensions.HasException<int, Exception>(null!) },
     };
 
     public static TheoryData<string, Func<Task>> NonGenericCases() => new()
     {
-        { "Match", () => ((Task<Result>)null!).Match(() => 0, _ => 0) },
-        { "MatchAsync", () => ((Task<Result>)null!).MatchAsync(() => Task.FromResult(0), _ => Task.FromResult(0)) },
-        { "Bind", () => ((Task<Result>)null!).Bind(Result.Success) },
-        { "BindAsync", () => ((Task<Result>)null!).BindAsync(() => Task.FromResult(Result.Success())) },
-        { "Bind<T>", () => ((Task<Result>)null!).Bind(() => Result<int>.Success(1)) },
-        { "BindAsync<T>", () => ((Task<Result>)null!).BindAsync(() => Task.FromResult(Result<int>.Success(1))) },
-        { "Tap", () => ((Task<Result>)null!).Tap(() => { }) },
-        { "TapAsync", () => ((Task<Result>)null!).TapAsync(() => Task.CompletedTask) },
-        { "TapError", () => ((Task<Result>)null!).TapError(_ => { }) },
-        { "TapErrorAsync", () => ((Task<Result>)null!).TapErrorAsync(_ => Task.CompletedTask) },
-        { "Ensure(Error)", () => ((Task<Result>)null!).Ensure(() => true, new Error("x")) },
-        { "Ensure(factory)", () => ((Task<Result>)null!).Ensure(() => true, () => new Error("x")) },
-        { "Switch", () => ((Task<Result>)null!).Switch(() => { }, _ => { }) },
-        { "SwitchAsync", () => ((Task<Result>)null!).SwitchAsync(() => Task.CompletedTask, _ => Task.CompletedTask) },
-        { "HasError", () => ((Task<Result>)null!).HasError<Error>() },
-        { "HasError(predicate)", () => ((Task<Result>)null!).HasError<Error>(_ => true) },
-        { "HasErrorCode", () => ((Task<Result>)null!).HasErrorCode("x") },
-        { "HasException", () => ((Task<Result>)null!).HasException<Exception>() },
+        { "Match", () => Null.Of<Task<Result>>().Match(() => 0, _ => 0) },
+        { "MatchAsync", () => Null.Of<Task<Result>>().MatchAsync(() => Task.FromResult(0), _ => Task.FromResult(0)) },
+        { "Bind", () => Null.Of<Task<Result>>().Bind(Result.Success) },
+        { "BindAsync", () => Null.Of<Task<Result>>().BindAsync(() => Task.FromResult(Result.Success())) },
+        { "Bind<T>", () => Null.Of<Task<Result>>().Bind(() => Result<int>.Success(1)) },
+        { "BindAsync<T>", () => Null.Of<Task<Result>>().BindAsync(() => Task.FromResult(Result<int>.Success(1))) },
+        { "Tap", () => Null.Of<Task<Result>>().Tap(() => { }) },
+        { "TapAsync", () => Null.Of<Task<Result>>().TapAsync(() => Task.CompletedTask) },
+        { "TapError", () => Null.Of<Task<Result>>().TapError(_ => { }) },
+        { "TapErrorAsync", () => Null.Of<Task<Result>>().TapErrorAsync(_ => Task.CompletedTask) },
+        { "Ensure(Error)", () => Null.Of<Task<Result>>().Ensure(() => true, new Error("x")) },
+        { "Ensure(factory)", () => Null.Of<Task<Result>>().Ensure(() => true, () => _ = new Error("x")) },
+        { "Switch", () => Null.Of<Task<Result>>().Switch(() => { }, _ => { }) },
+        { "SwitchAsync", () => Null.Of<Task<Result>>().SwitchAsync(() => Task.CompletedTask, _ => Task.CompletedTask) },
+        { "HasError", () => Null.Of<Task<Result>>().HasError<Error>() },
+        { "HasError(predicate)", () => Null.Of<Task<Result>>().HasError<Error>(_ => true) },
+        { "HasErrorCode", () => Null.Of<Task<Result>>().HasErrorCode("x") },
+        { "HasException", () => Null.Of<Task<Result>>().HasException<Exception>() },
     };
 
     [Theory]
@@ -211,28 +211,28 @@ public sealed class ErrorNullGuardTests
 {
     public static TheoryData<string, Action> Cases() => new()
     {
-        { "new Error(null, message)", () => new Error(null!, "message") },
-        { "new Error(code, null)", () => new Error("code", null!) },
-        { "new Error(null)", () => new Error(null!) },
-        { "WithMetadata(null, value)", () => new Error("e").WithMetadata(null!, "value") },
-        { "WithMetadata(key, null)", () => new Error("e").WithMetadata("key", null!) },
-        { "WithMetadata(null enumerable)", () => new Error("e").WithMetadata(null!) },
-        { "CausedBy((Error)null)", () => new Error("e").CausedBy((Error)null!) },
-        { "CausedBy((IEnumerable)null)", () => new Error("e").CausedBy((IEnumerable<Error>)null!) },
-        { "CausedBy((Exception)null)", () => new Error("e").CausedBy((Exception)null!) },
-        { "new ValidationError(null)", () => new ValidationError(null!) },
-        { "new ValidationError(null, message)", () => new ValidationError(null!, "message") },
-        { "new ValidationError(property, null)", () => new ValidationError("Email", null!) },
+        { "new Error(null, message)", () => _ = new Error(null!, "message") },
+        { "new Error(code, null)", () => _ = new Error("code", null!) },
+        { "new Error(null)", () => _ = new Error(null!) },
+        { "WithMetadata(null, value)", () => _ = new Error("e").WithMetadata(null!, "value") },
+        { "WithMetadata(key, null)", () => _ = new Error("e").WithMetadata("key", null!) },
+        { "WithMetadata(null enumerable)", () => _ = new Error("e").WithMetadata(null!) },
+        { "CausedBy((Error)null)", () => _ = new Error("e").CausedBy(Null.Of<Error>()) },
+        { "CausedBy((IEnumerable)null)", () => _ = new Error("e").CausedBy(Null.Of<IEnumerable<Error>>()) },
+        { "CausedBy((Exception)null)", () => _ = new Error("e").CausedBy(Null.Of<Exception>()) },
+        { "new ValidationError(null)", () => _ = new ValidationError(null!) },
+        { "new ValidationError(null, message)", () => _ = new ValidationError(null!, "message") },
+        { "new ValidationError(property, null)", () => _ = new ValidationError("Email", null!) },
         { "ValidationError.ForProperty(null)", () => ValidationError.ForProperty(null!) },
-        { "new NotFoundError(null)", () => new NotFoundError(null!) },
-        { "new NotFoundError(null, id)", () => new NotFoundError(null!, 42) },
-        { "new NotFoundError(entity, null)", () => new NotFoundError("Customer", null!) },
-        { "new ConflictError(null)", () => new ConflictError(null!) },
-        { "new ConflictError(null, message)", () => new ConflictError(null!, "message") },
-        { "new ForbiddenError(null)", () => new ForbiddenError(null!) },
-        { "new ForbiddenError(null, message)", () => new ForbiddenError(null!, "message") },
-        { "new ExceptionalError(null)", () => new ExceptionalError((Exception)null!) },
-        { "new ExceptionalError(message, null)", () => new ExceptionalError("message", null!) },
+        { "new NotFoundError(null)", () => _ = new NotFoundError(null!) },
+        { "new NotFoundError(null, id)", () => _ = new NotFoundError(null!, 42) },
+        { "new NotFoundError(entity, null)", () => _ = new NotFoundError("Customer", null!) },
+        { "new ConflictError(null)", () => _ = new ConflictError(null!) },
+        { "new ConflictError(null, message)", () => _ = new ConflictError(null!, "message") },
+        { "new ForbiddenError(null)", () => _ = new ForbiddenError(null!) },
+        { "new ForbiddenError(null, message)", () => _ = new ForbiddenError(null!, "message") },
+        { "new ExceptionalError(null)", () => _ = new ExceptionalError(Null.Of<Exception>()) },
+        { "new ExceptionalError(message, null)", () => _ = new ExceptionalError("message", null!) },
         { "Code = null via with", () => { _ = new Error("c", "m") with { Code = null! }; } },
         { "Message = null via with", () => { _ = new Error("c", "m") with { Message = null! }; } },
     };
@@ -245,12 +245,12 @@ public sealed class ErrorNullGuardTests
     [Fact]
     public void ParameterNames_ShouldBeReported()
     {
-        Assert.Equal("code", Assert.Throws<ArgumentNullException>(() => new Error(null!, "m")).ParamName);
-        Assert.Equal("message", Assert.Throws<ArgumentNullException>(() => new Error("c", null!)).ParamName);
-        Assert.Equal("propertyName", Assert.Throws<ArgumentNullException>(() => new ValidationError(null!, "m")).ParamName);
-        Assert.Equal("entityName", Assert.Throws<ArgumentNullException>(() => new NotFoundError(null!, 42)).ParamName);
-        Assert.Equal("entityId", Assert.Throws<ArgumentNullException>(() => new NotFoundError("Customer", null!)).ParamName);
-        Assert.Equal("exception", Assert.Throws<ArgumentNullException>(() => new ExceptionalError((Exception)null!)).ParamName);
+        Assert.Equal("code", Assert.Throws<ArgumentNullException>(() => _ = new Error(null!, "m")).ParamName);
+        Assert.Equal("message", Assert.Throws<ArgumentNullException>(() => _ = new Error("c", null!)).ParamName);
+        Assert.Equal("propertyName", Assert.Throws<ArgumentNullException>(() => _ = new ValidationError(null!, "m")).ParamName);
+        Assert.Equal("entityName", Assert.Throws<ArgumentNullException>(() => _ = new NotFoundError(null!, 42)).ParamName);
+        Assert.Equal("entityId", Assert.Throws<ArgumentNullException>(() => _ = new NotFoundError("Customer", null!)).ParamName);
+        Assert.Equal("exception", Assert.Throws<ArgumentNullException>(() => _ = new ExceptionalError(Null.Of<Exception>())).ParamName);
     }
 }
 
@@ -280,7 +280,7 @@ public sealed class ErrorCollectionValidationTests
     {
         IEnumerable<Error> causes = [new("c1"), null!, new("c3")];
 
-        Assert.Equal("causes", Assert.Throws<ArgumentException>(() => new Error("e").CausedBy(causes)).ParamName);
+        Assert.Equal("causes", Assert.Throws<ArgumentException>(() => _ = new Error("e").CausedBy(causes)).ParamName);
     }
 
     [Fact]

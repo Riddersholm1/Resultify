@@ -234,5 +234,5 @@ public sealed class RemainingCoverageTests
     [Fact]
     public async Task ResultT_TryAsync_ReturningResult_WhenCanceled_ShouldRethrow() =>
         await Assert.ThrowsAsync<OperationCanceledException>(() =>
-            Result<int>.TryAsync((Func<Task<Result<int>>>)(() => throw new OperationCanceledException())));
+            Result<int>.TryAsync(Canceling.FuncTaskOfResultOfInt));
 }

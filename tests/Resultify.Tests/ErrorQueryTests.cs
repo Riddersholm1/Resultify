@@ -52,7 +52,7 @@ public sealed class ResultErrorQueryTests
     [Fact]
     public void HasException_ShouldDetectTheWrappedExceptionType()
     {
-        Result result = Result.Try((Action)(() => throw new InvalidOperationException()));
+        Result result = Result.Try(Throwing.Action);
 
         Assert.True(result.HasException<InvalidOperationException>());
         Assert.False(result.HasException<ArgumentException>());
@@ -61,7 +61,7 @@ public sealed class ResultErrorQueryTests
     [Fact]
     public void HasException_ShouldMatchBaseExceptionTypes()
     {
-        Result result = Result.Try((Action)(() => throw new InvalidOperationException()));
+        Result result = Result.Try(Throwing.Action);
 
         Assert.True(result.HasException<Exception>());
     }
@@ -123,7 +123,7 @@ public sealed class ResultTErrorQueryTests
     [Fact]
     public void HasException_ShouldDetectTheWrappedExceptionType()
     {
-        Result<int> result = Result<int>.Try((Func<int>)(() => throw new InvalidOperationException()));
+        Result<int> result = Result<int>.Try(Throwing.FuncInt);
 
         Assert.True(result.HasException<InvalidOperationException>());
         Assert.False(result.HasException<ArgumentException>());
@@ -183,7 +183,7 @@ public sealed class AsyncErrorQueryTests
     [Fact]
     public async Task NonGeneric_HasException_ShouldDetectWrappedException()
     {
-        Task<Result> task = Task.FromResult(Result.Try((Action)(() => throw new InvalidOperationException())));
+        Task<Result> task = Task.FromResult(Result.Try(Throwing.Action));
 
         Assert.True(await task.HasException<InvalidOperationException>());
         Assert.False(await task.HasException<ArgumentException>());
@@ -220,7 +220,7 @@ public sealed class AsyncErrorQueryTests
         Assert.True(await ResultExtensions.HasError<int, ValidationError>(task));
         Assert.True((await task).HasError<ValidationError>());
 
-        Task<Result<int>> faulted = Task.FromResult(Result<int>.Try((Func<int>)(() => throw new TimeoutException())));
+        Task<Result<int>> faulted = Task.FromResult(Result<int>.Try(Throwing.FuncIntTimeout));
 
         Assert.True(await ResultExtensions.HasException<int, TimeoutException>(faulted));
         Assert.True((await faulted).HasException<TimeoutException>());

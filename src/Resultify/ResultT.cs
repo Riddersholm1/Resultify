@@ -17,7 +17,7 @@ namespace Resultify;
 /// </para>
 /// <para>
 /// Combinators never swallow exceptions. If a callback you pass to <see cref="Map{TNew}"/>,
-/// <see cref="Bind{TNew}(Func{TValue, Result{TNew}})"/>, <see cref="Tap(Action{TValue})"/>,
+/// <see cref="Bind{TNew}"/>, <see cref="Tap(Action{TValue})"/>,
 /// <see cref="Ensure(Func{TValue, bool}, Error)"/>, <see cref="Match{TOut}"/> or
 /// <see cref="Switch"/> throws, the exception propagates unchanged — use
 /// <see cref="Try(Func{TValue}, Func{Exception, Error})"/> when you want it turned into a failure.
@@ -466,7 +466,7 @@ public readonly struct Result<TValue> : IEquatable<Result<TValue>>
             : Result<TNew>.FailureUnchecked(Errors);
     }
 
-    /// <summary>Async <see cref="Bind{TNew}(Func{TValue, Result{TNew}})"/>.</summary>
+    /// <summary>Async <see cref="Bind{TNew}"/>.</summary>
     /// <typeparam name="TNew">The value type produced by <paramref name="bind"/>.</typeparam>
     /// <param name="bind">The next step. Invoked only when this result is successful.</param>
     /// <returns>The result of <paramref name="bind"/>, or this result's errors unchanged.</returns>

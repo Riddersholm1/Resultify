@@ -42,7 +42,7 @@ public sealed class TypedAsyncPipelineTests
     {
         var invoked = false;
 
-        Result<string> result = await Failure().BindAsync(v =>
+        Result<string> result = await Failure().BindAsync(_ =>
         {
             invoked = true;
             return Task.FromResult(Result<string>.Success("nope"));

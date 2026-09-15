@@ -8,9 +8,9 @@ namespace Resultify.Tests;
 /// normal path, the throwing path, the custom <c>exceptionHandler</c>, and cancellation.
 /// </summary>
 /// <remarks>
-/// Note the explicit casts on the throwing lambdas: a throw-only lambda body is convertible to both
-/// <c>Action</c> and <c>Func&lt;Result&gt;</c>, and overload resolution picks the <c>Func</c> form.
-/// Without the cast, the "action" tests would silently exercise the wrong overload.
+/// The throwing callbacks come from <see cref="Throwing"/> and <see cref="Canceling"/> rather than
+/// inline lambdas: a throw-only lambda is convertible to several of these overloads at once, so a
+/// named method group is what pins each test to the overload its name claims.
 /// </remarks>
 public sealed class ResultTryTests
 {
@@ -28,12 +28,12 @@ public sealed class ResultTryTests
     [Fact]
     public void Try_Action_WhenException_ShouldWrapAsExceptionalError()
     {
-        Result result = Result.Try((Action)(() => throw new InvalidOperationException("boom")));
+        Result result = Result.Try(Throwing.Action);
 
         Assert.True(result.IsFailure);
         ExceptionalError error = Assert.IsType<ExceptionalError>(result.FirstError);
         Assert.Equal("Exception.InvalidOperationException", error.Code);
-        Assert.Equal("boom", error.Message);
+        Assert.Equal(Throwing.Message, error.Message);
     }
 
     [Fact]
@@ -53,7 +53,7 @@ public sealed class ResultTryTests
     [Fact]
     public void Try_FuncResult_WhenException_ShouldWrapAsExceptionalError()
     {
-        Result result = Result.Try((Func<Result>)(() => throw new InvalidOperationException("boom")));
+        Result result = Result.Try(Throwing.FuncResult);
 
         Assert.True(result.IsFailure);
         Assert.IsType<ExceptionalError>(result.FirstError);
@@ -66,11 +66,11 @@ public sealed class ResultTryTests
     [Fact]
     public async Task TryAsync_FuncTask_WhenException_ShouldWrapAsExceptionalError()
     {
-        Result result = await Result.TryAsync((Func<Task>)(() => throw new InvalidOperationException("async boom")));
+        Result result = await Result.TryAsync(Throwing.FuncTask);
 
         Assert.True(result.IsFailure);
         Assert.IsType<ExceptionalError>(result.FirstError);
-        Assert.Equal("async boom", result.FirstError.Message);
+        Assert.Equal(Throwing.Message, result.FirstError.Message);
     }
 
     [Fact]
@@ -98,7 +98,7 @@ public sealed class ResultTryTests
     [Fact]
     public async Task TryAsync_FuncTaskResult_WhenException_ShouldWrapAsExceptionalError()
     {
-        Result result = await Result.TryAsync((Func<Task<Result>>)(() => throw new InvalidOperationException("boom")));
+        Result result = await Result.TryAsync(Throwing.FuncTaskOfResult);
 
         Assert.True(result.IsFailure);
         Assert.IsType<ExceptionalError>(result.FirstError);
@@ -119,7 +119,7 @@ public sealed class ResultTTryTests
     [Fact]
     public void Try_Func_WhenException_ShouldWrapAsExceptionalError()
     {
-        Result<int> result = Result<int>.Try((Func<int>)(() => throw new InvalidOperationException("boom")));
+        Result<int> result = Result<int>.Try(Throwing.FuncInt);
 
         Assert.True(result.IsFailure);
         Assert.IsType<ExceptionalError>(result.FirstError);
@@ -174,7 +174,7 @@ public sealed class ResultTTryTests
     [Fact]
     public void Try_FuncResultT_WhenException_ShouldWrapAsExceptionalError()
     {
-        Result<int> result = Result<int>.Try((Func<Result<int>>)(() => throw new InvalidOperationException("boom")));
+        Result<int> result = Result<int>.Try(Throwing.FuncResultOfInt);
 
         Assert.True(result.IsFailure);
         Assert.IsType<ExceptionalError>(result.FirstError);
@@ -200,7 +200,7 @@ public sealed class ResultTTryTests
     [Fact]
     public async Task TryAsync_FuncTaskT_WhenException_ShouldWrapAsExceptionalError()
     {
-        Result<int> result = await Result<int>.TryAsync((Func<Task<int>>)(() => throw new InvalidOperationException("boom")));
+        Result<int> result = await Result<int>.TryAsync(Throwing.FuncTaskOfInt);
 
         Assert.True(result.IsFailure);
         Assert.IsType<ExceptionalError>(result.FirstError);
@@ -225,7 +225,7 @@ public sealed class ResultTTryTests
     [Fact]
     public async Task TryAsync_FuncTaskResultT_WhenException_ShouldWrapAsExceptionalError()
     {
-        Result<int> result = await Result<int>.TryAsync((Func<Task<Result<int>>>)(() => throw new InvalidOperationException("boom")));
+        Result<int> result = await Result<int>.TryAsync(Throwing.FuncTaskOfResultOfInt);
 
         Assert.True(result.IsFailure);
         Assert.IsType<ExceptionalError>(result.FirstError);
@@ -248,42 +248,42 @@ public sealed class TryExceptionHandlerTests
     {
         Assert.True(result.IsFailure);
         Assert.Equal("Mapped.Failure", result.FirstError.Code);
-        Assert.Equal("mapped: boom", result.FirstError.Message);
+        Assert.Equal($"mapped: {Throwing.Message}", result.FirstError.Message);
         Assert.Single(result.FirstError.Causes);
         Assert.IsNotType<ExceptionalError>(result.FirstError);
     }
 
     [Fact]
     public void Try_Action_WithHandler_ShouldUseTheMappedError() =>
-        AssertMapped(Result.Try((Action)(() => throw new InvalidOperationException("boom")), Handler));
+        AssertMapped(Result.Try(Throwing.Action, Handler));
 
     [Fact]
     public void Try_FuncResult_WithHandler_ShouldUseTheMappedError() =>
-        AssertMapped(Result.Try((Func<Result>)(() => throw new InvalidOperationException("boom")), Handler));
+        AssertMapped(Result.Try(Throwing.FuncResult, Handler));
 
     [Fact]
     public async Task TryAsync_FuncTask_WithHandler_ShouldUseTheMappedError() =>
-        AssertMapped(await Result.TryAsync((Func<Task>)(() => throw new InvalidOperationException("boom")), Handler));
+        AssertMapped(await Result.TryAsync(Throwing.FuncTask, Handler));
 
     [Fact]
     public async Task TryAsync_FuncTaskResult_WithHandler_ShouldUseTheMappedError() =>
-        AssertMapped(await Result.TryAsync((Func<Task<Result>>)(() => throw new InvalidOperationException("boom")), Handler));
+        AssertMapped(await Result.TryAsync(Throwing.FuncTaskOfResult, Handler));
 
     [Fact]
     public void TryT_Func_WithHandler_ShouldUseTheMappedError() =>
-        AssertMapped(Result<int>.Try((Func<int>)(() => throw new InvalidOperationException("boom")), Handler).ToResult());
+        AssertMapped(Result<int>.Try(Throwing.FuncInt, Handler).ToResult());
 
     [Fact]
     public void TryT_FuncResultT_WithHandler_ShouldUseTheMappedError() =>
-        AssertMapped(Result<int>.Try((Func<Result<int>>)(() => throw new InvalidOperationException("boom")), Handler).ToResult());
+        AssertMapped(Result<int>.Try(Throwing.FuncResultOfInt, Handler).ToResult());
 
     [Fact]
     public async Task TryAsyncT_FuncTaskT_WithHandler_ShouldUseTheMappedError() =>
-        AssertMapped((await Result<int>.TryAsync((Func<Task<int>>)(() => throw new InvalidOperationException("boom")), Handler)).ToResult());
+        AssertMapped((await Result<int>.TryAsync(Throwing.FuncTaskOfInt, Handler)).ToResult());
 
     [Fact]
     public async Task TryAsyncT_FuncTaskResultT_WithHandler_ShouldUseTheMappedError() =>
-        AssertMapped((await Result<int>.TryAsync((Func<Task<Result<int>>>)(() => throw new InvalidOperationException("boom")), Handler)).ToResult());
+        AssertMapped((await Result<int>.TryAsync(Throwing.FuncTaskOfResultOfInt, Handler)).ToResult());
 
     [Fact]
     public void Try_WithHandler_ShouldNotRunWhenNothingThrows()
@@ -299,18 +299,18 @@ public sealed class TryExceptionHandlerTests
     [Fact]
     public void Try_WhenHandlerReturnsNull_ShouldFallBackToExceptionalError()
     {
-        Result result = Result.Try((Action)(() => throw new InvalidOperationException("boom")), NullReturningHandler);
+        Result result = Result.Try(Throwing.Action, NullReturningHandler);
 
         Assert.True(result.IsFailure);
         Assert.IsType<ExceptionalError>(result.FirstError);
-        Assert.Equal("boom", result.FirstError.Message);
+        Assert.Equal(Throwing.Message, result.FirstError.Message);
     }
 
     [Fact]
     public async Task TryAsync_WhenHandlerReturnsNull_ShouldFallBackToExceptionalError()
     {
         Result result = await Result.TryAsync(
-            (Func<Task>)(() => throw new InvalidOperationException("boom")),
+            Throwing.FuncTask,
             NullReturningHandler);
 
         Assert.IsType<ExceptionalError>(result.FirstError);
@@ -319,7 +319,7 @@ public sealed class TryExceptionHandlerTests
     [Fact]
     public void TryT_WhenHandlerReturnsNull_ShouldFallBackToExceptionalError()
     {
-        Result<int> result = Result<int>.Try((Func<int>)(() => throw new InvalidOperationException("boom")), NullReturningHandler);
+        Result<int> result = Result<int>.Try(Throwing.FuncInt, NullReturningHandler);
 
         Assert.IsType<ExceptionalError>(result.FirstError);
     }
@@ -329,7 +329,7 @@ public sealed class TryExceptionHandlerTests
     {
         Exception ex = Assert.ThrowsAny<Exception>(() =>
             Result.Try(
-                (Action)(() => throw new InvalidOperationException("original")),
+                Throwing.Action,
                 _ => throw new NotSupportedException("from handler")));
 
         Assert.IsType<NotSupportedException>(ex);
@@ -346,32 +346,32 @@ public sealed class TryCancellationTests
     [Fact]
     public void Try_Action_WhenOperationCanceled_ShouldRethrow() =>
         Assert.Throws<OperationCanceledException>(() =>
-            Result.Try((Action)(() => throw new OperationCanceledException())));
+            Result.Try(Canceling.Action));
 
     [Fact]
     public void Try_FuncResult_WhenOperationCanceled_ShouldRethrow() =>
         Assert.Throws<OperationCanceledException>(() =>
-            Result.Try((Func<Result>)(() => throw new OperationCanceledException())));
+            Result.Try(Canceling.FuncResult));
 
     [Fact]
     public void TryT_Func_WhenOperationCanceled_ShouldRethrow() =>
         Assert.Throws<OperationCanceledException>(() =>
-            Result<int>.Try((Func<int>)(() => throw new OperationCanceledException())));
+            Result<int>.Try(Canceling.FuncInt));
 
     [Fact]
     public void TryT_FuncResultT_WhenOperationCanceled_ShouldRethrow() =>
         Assert.Throws<OperationCanceledException>(() =>
-            Result<int>.Try((Func<Result<int>>)(() => throw new OperationCanceledException())));
+            Result<int>.Try(Canceling.FuncResultOfInt));
 
     [Fact]
     public async Task TryAsync_WhenOperationCanceled_ShouldRethrow() =>
         await Assert.ThrowsAsync<OperationCanceledException>(() =>
-            Result.TryAsync((Func<Task>)(() => throw new OperationCanceledException())));
+            Result.TryAsync(Canceling.FuncTask));
 
     [Fact]
     public async Task TryAsyncT_WhenOperationCanceled_ShouldRethrow() =>
         await Assert.ThrowsAsync<OperationCanceledException>(() =>
-            Result<int>.TryAsync((Func<Task<int>>)(() => throw new OperationCanceledException())));
+            Result<int>.TryAsync(Canceling.FuncTaskOfInt));
 
     [Fact]
     public async Task TryAsync_WhenTaskCanceled_ShouldRethrow() =>
@@ -383,10 +383,11 @@ public sealed class TryCancellationTests
     {
         using var cts = new CancellationTokenSource();
         await cts.CancelAsync();
+        CancellationToken token = cts.Token;
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
             Result.TryAsync(
-                async () => await Task.Delay(Timeout.Infinite, cts.Token),
+                async () => await Task.Delay(Timeout.Infinite, token),
                 _ => new Error("should.not.be.used")));
     }
 }
