@@ -112,7 +112,9 @@ public sealed class DefaultResultTests
     {
         InvalidOperationException ex = Assert.Throws<InvalidOperationException>(act);
 
-        Assert.Contains("Value", ex.Message, StringComparison.Ordinal);
+        Assert.True(
+            ex.Message.Contains("Value", StringComparison.Ordinal),
+            $"{name}: the exception should explain that Value is unavailable, but said '{ex.Message}'.");
     }
 
     [Fact]

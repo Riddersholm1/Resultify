@@ -10,35 +10,28 @@ namespace Resultify.Tests;
 /// </summary>
 public sealed class ErrorToStringTests
 {
-    public static TheoryData<string, Error, string> AllErrorTypes() => new()
+    public static TheoryData<Error, string> AllErrorTypes() => new()
     {
-        { "Error", new Error("Plain.Code", "plain message"), "[Plain.Code] plain message" },
-        { "Error (no code)", new Error("just a message"), "just a message" },
-        { "ValidationError", new ValidationError("Email", "Email is required"), "[Validation.Email] Email is required" },
-        { "ValidationError (no property)", new ValidationError("is invalid"), "[Validation.Invalid] is invalid" },
-        { "NotFoundError", new NotFoundError("Customer", 42), "[Customer.NotFound] Customer with id '42' was not found." },
-        { "NotFoundError (message)", new NotFoundError("nope"), "[NotFound] nope" },
-        { "ConflictError", new ConflictError("Duplicate resource."), "[Conflict] Duplicate resource." },
-        { "ForbiddenError", new ForbiddenError("Access denied."), "[Forbidden] Access denied." },
-        { "ExceptionalError", new ExceptionalError(new InvalidOperationException("boom")), "[Exception.InvalidOperationException] boom" },
+        { new Error("Plain.Code", "plain message"), "[Plain.Code] plain message" },
+        { new Error("just a message"), "just a message" },
+        { new ValidationError("Email", "Email is required"), "[Validation.Email] Email is required" },
+        { new ValidationError("is invalid"), "[Validation.Invalid] is invalid" },
+        { new NotFoundError("Customer", 42), "[Customer.NotFound] Customer with id '42' was not found." },
+        { new NotFoundError("nope"), "[NotFound] nope" },
+        { new ConflictError("Duplicate resource."), "[Conflict] Duplicate resource." },
+        { new ForbiddenError("Access denied."), "[Forbidden] Access denied." },
+        { new ExceptionalError(new InvalidOperationException("boom")), "[Exception.InvalidOperationException] boom" },
     };
 
+    /// <summary>
+    /// Asserting the exact rendering also pins the regression this type exists for: if a derived
+    /// record ever supplies its own <c>ToString</c> again, the output becomes
+    /// <c>"NotFoundError { Code = …, Metadata = … }"</c> and this fails.
+    /// </summary>
     [Theory]
     [MemberData(nameof(AllErrorTypes))]
-    public void ToString_ShouldUseTheCodeAndMessageFormat(string name, Error error, string expected) =>
+    public void ToString_ShouldUseTheCodeAndMessageFormat(Error error, string expected) =>
         Assert.Equal(expected, error.ToString());
-
-    [Theory]
-    [MemberData(nameof(AllErrorTypes))]
-    public void ToString_ShouldNotLeakRecordInternals(string name, Error error, string expected)
-    {
-        string text = error.ToString();
-
-        Assert.DoesNotContain("Metadata", text, StringComparison.Ordinal);
-        Assert.DoesNotContain("Causes", text, StringComparison.Ordinal);
-        Assert.DoesNotContain("ImmutableDictionary", text, StringComparison.Ordinal);
-        Assert.DoesNotContain(error.GetType().Name + " {", text, StringComparison.Ordinal);
-    }
 
     [Fact]
     public void ToString_WithCausesAndCode_ShouldIncludeAll()

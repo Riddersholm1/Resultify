@@ -48,8 +48,12 @@ public sealed class FactoryNullGuardTests
 
     [Theory]
     [MemberData(nameof(Cases))]
-    public void NullArgument_ShouldThrowArgumentNullException(string name, Action act) =>
-        Assert.Throws<ArgumentNullException>(act);
+    public void NullArgument_ShouldThrowArgumentNullException(string name, Action act)
+    {
+        ArgumentNullException thrown = Assert.Throws<ArgumentNullException>(act);
+
+        Assert.False(string.IsNullOrEmpty(thrown.ParamName), $"{name}: the guard should name the rejected parameter.");
+    }
 }
 
 public sealed class CombinatorNullGuardTests
@@ -122,13 +126,21 @@ public sealed class CombinatorNullGuardTests
 
     [Theory]
     [MemberData(nameof(Cases))]
-    public void NullArgument_ShouldThrowArgumentNullException(string name, Action act) =>
-        Assert.Throws<ArgumentNullException>(act);
+    public void NullArgument_ShouldThrowArgumentNullException(string name, Action act)
+    {
+        ArgumentNullException thrown = Assert.Throws<ArgumentNullException>(act);
+
+        Assert.False(string.IsNullOrEmpty(thrown.ParamName), $"{name}: the guard should name the rejected parameter.");
+    }
 
     [Theory]
     [MemberData(nameof(AsyncCases))]
-    public async Task NullArgument_OnAsyncCombinator_ShouldFaultTheReturnedTask(string name, Func<Task> act) =>
-        await Assert.ThrowsAsync<ArgumentNullException>(act);
+    public async Task NullArgument_OnAsyncCombinator_ShouldFaultTheReturnedTask(string name, Func<Task> act)
+    {
+        ArgumentNullException thrown = await Assert.ThrowsAsync<ArgumentNullException>(act);
+
+        Assert.False(string.IsNullOrEmpty(thrown.ParamName), $"{name}: the guard should name the rejected parameter.");
+    }
 
     [Fact]
     public void Guards_ShouldFireEvenWhenTheCallbackWouldNotHaveRun()
@@ -198,13 +210,21 @@ public sealed class AsyncPipelineNullGuardTests
 
     [Theory]
     [MemberData(nameof(TypedCases))]
-    public async Task TypedPipeline_WithNullTask_ShouldThrowArgumentNullException(string name, Func<Task> act) =>
-        await Assert.ThrowsAsync<ArgumentNullException>(act);
+    public async Task TypedPipeline_WithNullTask_ShouldThrowArgumentNullException(string name, Func<Task> act)
+    {
+        ArgumentNullException thrown = await Assert.ThrowsAsync<ArgumentNullException>(act);
+
+        Assert.False(string.IsNullOrEmpty(thrown.ParamName), $"{name}: the guard should name the rejected parameter.");
+    }
 
     [Theory]
     [MemberData(nameof(NonGenericCases))]
-    public async Task NonGenericPipeline_WithNullTask_ShouldThrowArgumentNullException(string name, Func<Task> act) =>
-        await Assert.ThrowsAsync<ArgumentNullException>(act);
+    public async Task NonGenericPipeline_WithNullTask_ShouldThrowArgumentNullException(string name, Func<Task> act)
+    {
+        ArgumentNullException thrown = await Assert.ThrowsAsync<ArgumentNullException>(act);
+
+        Assert.False(string.IsNullOrEmpty(thrown.ParamName), $"{name}: the guard should name the rejected parameter.");
+    }
 }
 
 public sealed class ErrorNullGuardTests
@@ -239,8 +259,12 @@ public sealed class ErrorNullGuardTests
 
     [Theory]
     [MemberData(nameof(Cases))]
-    public void NullArgument_ShouldThrowArgumentNullException(string name, Action act) =>
-        Assert.Throws<ArgumentNullException>(act);
+    public void NullArgument_ShouldThrowArgumentNullException(string name, Action act)
+    {
+        ArgumentNullException thrown = Assert.Throws<ArgumentNullException>(act);
+
+        Assert.False(string.IsNullOrEmpty(thrown.ParamName), $"{name}: the guard should name the rejected parameter.");
+    }
 
     [Fact]
     public void ParameterNames_ShouldBeReported()

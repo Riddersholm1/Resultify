@@ -49,6 +49,7 @@ public sealed class ErrorListImmutabilityTests
             return; // not reachable as IList at all, which is even stronger
         }
 
+        Assert.True(list.IsReadOnly, $"{path}: the list should report itself read-only.");
         Assert.ThrowsAny<NotSupportedException>(() => list.Add(new Error("injected")));
         if (list.Count > 0)
         {
