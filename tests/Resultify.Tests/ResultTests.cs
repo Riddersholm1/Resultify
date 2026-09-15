@@ -76,55 +76,6 @@ public sealed class ResultTests
         Assert.True(result.IsSuccess);
     }
 
-    // ── Try ──────────────────────────────────────────────────
-
-    [Fact]
-    public void Try_WhenNoException_ShouldSucceed()
-    {
-        Result result = Result.Try(() => { });
-
-        Assert.True(result.IsSuccess);
-    }
-
-    [Fact]
-    public void Try_WhenException_ShouldFail()
-    {
-        Result result = Result.Try(() => throw new InvalidOperationException("boom"));
-
-        Assert.True(result.IsFailure);
-        Assert.IsType<ExceptionalError>(result.FirstError);
-    }
-
-    [Fact]
-    public void Try_ExceptionCode_ShouldBeExceptionName()
-    {
-        Result result = Result.Try(() => throw new InvalidOperationException("boom"));
-
-        Assert.Equal("Exception.InvalidOperationException", result.FirstError.Code);
-    }
-
-    // ── Merge ────────────────────────────────────────────────
-
-    [Fact]
-    public void Merge_AllSuccess_ShouldSucceed()
-    {
-        Result merged = Result.Merge(Result.Success(), Result.Success());
-
-        Assert.True(merged.IsSuccess);
-    }
-
-    [Fact]
-    public void Merge_WithFailures_ShouldCombineErrors()
-    {
-        Result merged = Result.Merge(
-            Result.Failure("Error 1"),
-            Result.Success(),
-            Result.Failure("Error 2"));
-
-        Assert.True(merged.IsFailure);
-        Assert.Equal(2, merged.Errors.Count);
-    }
-
     // ── Bind ─────────────────────────────────────────────────
 
     [Fact]

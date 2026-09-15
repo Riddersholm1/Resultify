@@ -21,14 +21,3 @@
     Justification = "'Error' matches the DDD convention and is a deliberate API choice.",
     Scope = "type",
     Target = "~T:Resultify.Errors.Error")]
-
-// CA1708: The C# 14 extension-members feature generates hidden helper methods whose
-// compiler-produced names differ only by case across extension blocks with different
-// receiver types (e.g. Result vs Task<Result>). There is no user-visible conflict; this
-// is a known false positive for the new syntax.
-[assembly: SuppressMessage(
-    "Naming",
-    "CA1708:Identifiers should differ by more than case",
-    Justification = "C# 14 extension-member syntax produces compiler-generated names that trigger a false positive.",
-    Scope = "type",
-    Target = "~T:Resultify.ResultExtensions")]

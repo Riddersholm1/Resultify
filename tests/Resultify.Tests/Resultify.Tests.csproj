@@ -6,6 +6,27 @@
     <Nullable>enable</Nullable>
     <LangVersion>latest</LangVersion>
     <IsPackable>false</IsPackable>
+
+    <!--
+      Keep this project on the classic VSTest runner.
+
+      xunit.v3 4.x pulls in Microsoft.Testing.Platform 2.x, which hard-errors when a test project
+      built as an MTP application is run through the VSTest target on the .NET 10 SDK or later
+      ("Testing with VSTest target is no longer supported..."). That would take `dotnet test`,
+      the trx logger and the XPlat Code Coverage collector with it, since those are VSTest concepts.
+
+      xunit still generates either entry point, selected by UseMicrosoftTestingPlatformRunner:
+      the MTP one, or its own console runner. Choosing the console runner — and clearing the flag
+      that marks this as an MTP application — keeps the VSTest path, so the pipeline and coverlet
+      collector continue to work unchanged while the packages stay current.
+
+      When migrating to Microsoft.Testing.Platform later, both properties come out together with
+      the VSTest-only packages (Microsoft.NET.Test.Sdk, xunit.runner.visualstudio,
+      coverlet.collector), a global.json opting into the new `dotnet test`, and MTP's own trx and
+      coverage extensions.
+    -->
+    <UseMicrosoftTestingPlatformRunner>false</UseMicrosoftTestingPlatformRunner>
+    <IsTestingPlatformApplication>false</IsTestingPlatformApplication>
   </PropertyGroup>
 
   <ItemGroup>
@@ -13,12 +34,12 @@
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.6.0" />
-    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5">
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.10.0" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="4.0.0">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
-    <PackageReference Include="xunit.v3" Version="3.2.2" />
+    <PackageReference Include="xunit.v3" Version="4.0.1" />
   </ItemGroup>
 
   <ItemGroup>
