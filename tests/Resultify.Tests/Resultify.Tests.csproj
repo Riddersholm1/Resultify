@@ -13,7 +13,7 @@
       xunit.v3 4.x pulls in Microsoft.Testing.Platform 2.x, which hard-errors when a test project
       built as an MTP application is run through the VSTest target on the .NET 10 SDK or later
       ("Testing with VSTest target is no longer supported..."). That would take `dotnet test`,
-      `--logger trx` and `--collect:"XPlat Code Coverage"` with it, since those are VSTest concepts.
+      the trx logger and the XPlat Code Coverage collector with it, since those are VSTest concepts.
 
       xunit still generates either entry point, selected by UseMicrosoftTestingPlatformRunner:
       the MTP one, or its own console runner. Choosing the console runner — and clearing the flag
