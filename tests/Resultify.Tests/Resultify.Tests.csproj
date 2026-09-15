@@ -8,37 +8,32 @@
     <IsPackable>false</IsPackable>
 
     <!--
-      Keep this project on the classic VSTest runner.
-
-      xunit.v3 4.x pulls in Microsoft.Testing.Platform 2.x, which hard-errors when a test project
-      built as an MTP application is run through the VSTest target on the .NET 10 SDK or later
-      ("Testing with VSTest target is no longer supported..."). That would take `dotnet test`,
-      the trx logger and the XPlat Code Coverage collector with it, since those are VSTest concepts.
-
-      xunit still generates either entry point, selected by UseMicrosoftTestingPlatformRunner:
-      the MTP one, or its own console runner. Choosing the console runner — and clearing the flag
-      that marks this as an MTP application — keeps the VSTest path, so the pipeline and coverlet
-      collector continue to work unchanged while the packages stay current.
-
-      When migrating to Microsoft.Testing.Platform later, both properties come out together with
-      the VSTest-only packages (Microsoft.NET.Test.Sdk, xunit.runner.visualstudio,
-      coverlet.collector), a global.json opting into the new `dotnet test`, and MTP's own trx and
-      coverage extensions.
+      xUnit.net v3 test projects are executables. Microsoft.NET.Test.Sdk used to set this for us;
+      it is gone with the move to Microsoft.Testing.Platform, so the project sets it itself.
+      Without it, xunit.v3.core.mtp-v2.targets fails the build.
     -->
-    <UseMicrosoftTestingPlatformRunner>false</UseMicrosoftTestingPlatformRunner>
-    <IsTestingPlatformApplication>false</IsTestingPlatformApplication>
+    <OutputType>Exe</OutputType>
+
+    <!--
+      Run on Microsoft.Testing.Platform rather than xUnit.net's own console runner. The runner is
+      selected when the entry point is generated, so this decides how the built executable behaves
+      when it is started directly, and it is what makes the extension options below available.
+      IsTestingPlatformApplication is already true by default (xunit.v3.core.mtp-v2.props), which is
+      what lets `dotnet test` discover this project; the VSTest target refuses to run such a project
+      on the .NET 10 SDK, so global.json opts the repository into the MTP `dotnet test` experience.
+    -->
+    <UseMicrosoftTestingPlatformRunner>true</UseMicrosoftTestingPlatformRunner>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="coverlet.collector" Version="10.0.1">
-      <PrivateAssets>all</PrivateAssets>
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-    </PackageReference>
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.10.0" />
-    <PackageReference Include="xunit.runner.visualstudio" Version="4.0.0">
-      <PrivateAssets>all</PrivateAssets>
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-    </PackageReference>
+    <!--
+      Reporting and coverage are platform extensions, not built-in: an option is only recognised
+      when the test application registers the package that provides it, otherwise the run fails
+      with exit code 5. xunit.v3 registers the report writers behind the report-xunit-trx option,
+      and Microsoft.Testing.Extensions.CodeCoverage registers the coverage option. The CI pipeline's
+      test step passes both.
+    -->
+    <PackageReference Include="Microsoft.Testing.Extensions.CodeCoverage" Version="18.11.2" />
     <PackageReference Include="xunit.v3" Version="4.0.1" />
   </ItemGroup>
 
