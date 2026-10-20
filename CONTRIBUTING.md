@@ -60,8 +60,25 @@ behaviours changed.
 | A new public member | minor |
 | Removing or re-signing a member, or changing observable behaviour — an output format, an exception thrown, what a cast allows | **major** |
 
-A major version gets an *Upgrading from N.x* section in the README, as 2.0 did. There is no automated
-public-API check in this repository, so describe every public API change in the pull request.
+A major version gets an *Upgrading from N.x* section in the README, as 2.0 did.
+
+### Breaking-change check
+
+`EnablePackageValidation` and `PackageValidationBaselineVersion` in
+[`src/Resultify/Resultify.csproj`](src/Resultify/Resultify.csproj) make every `dotnet pack` download that
+published release (today `2.0.0`) and compare the new package with it. Removing or changing a published
+member fails the pack with `CP0002` and similar errors, naming the member. A major release is the one
+place to accept a break: pack once with `-p:ApiCompatGenerateSuppressionFile=true`, which writes the
+accepted differences to a `CompatibilitySuppressions.xml` next to the project, and commit that file with
+the change.
+
+Package validation cannot see behaviour, so describe any behavioural change in the pull request, and
+decide its version bump by the table above.
+
+It compares compiled metadata, so pack with a current SDK (CI uses the newest .NET 10 release). Older
+compilers — at least the one in the 10.0.1xx SDKs — write the nullability of C# 14 extension-block type
+parameters differently, which shows up as false `CP0021 Cannot add constraint 'notnull'` errors on the
+`Task<Result<T>>` extensions.
 
 ## Commit messages
 
@@ -73,19 +90,20 @@ diff already tells them what.
 Publishing to NuGet happens one way, and only one way — the same as for Riddersholm.EventBus and
 Riddersholm.Money:
 
-1. Merge the change to `main`. The version is not stored in the repository: `<Version>` in
-   [`src/Resultify/Resultify.csproj`](src/Resultify/Resultify.csproj) stays `0.0.0`, and the release tag
-   supplies the real one.
+1. Set `<Version>` in [`src/Resultify/Resultify.csproj`](src/Resultify/Resultify.csproj) to the version
+   you are releasing and merge that to `main`. It is the version local builds and pull-request builds
+   get; the release itself takes its version from the tag.
 2. Tag the merge commit — `git tag v2.1.0 && git push origin v2.1.0`.
 3. **Publish a GitHub Release for that tag.** This is what triggers the publish job in
    [`pipeline.yml`](.github/workflows/pipeline.yml); the tag alone does nothing. There is no CHANGELOG
    file, so the release notes are the record of what changed. Tick *Set as a pre-release* for an
    `-rc`/`-beta` version.
+4. Once a stable release is on nuget.org, raise `PackageValidationBaselineVersion` to it.
 
-The release run builds with `-warnaserror` and runs the tests before the publish job pushes anything,
-so a release cannot ship something CI would have rejected. The package version is the tag with the
-leading `v` stripped, used as-is, so tag plain versions only (`v2.1.0`, `v2.1.0-rc.1`). The push uses
-`--skip-duplicate`, so re-running a half-finished release is safe.
+The release run builds with `-warnaserror`, runs the tests and packs (with package validation) before
+the publish job pushes anything, so a release cannot ship something CI would have rejected. The package
+version is the tag with the leading `v` stripped, used as-is, so tag plain versions only (`v2.1.0`,
+`v2.1.0-rc.1`). The push uses `--skip-duplicate`, so re-running a half-finished release is safe.
 
 There is **no `NUGET_API_KEY` secret**, deliberately. The workflow authenticates with
 [Trusted Publishing](https://learn.microsoft.com/nuget/nuget-org/trusted-publishing): GitHub mints an

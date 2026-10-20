@@ -10,12 +10,22 @@
 		<TreatWarningsAsErrors>true</TreatWarningsAsErrors>
 		<IsAotCompatible>true</IsAotCompatible>
 		<IsTrimmable>true</IsTrimmable>
+
+		<!-- Fail the build on any accidental break of the published API surface. -->
+		<EnablePackageValidation>true</EnablePackageValidation>
+		<PackageValidationBaselineVersion>2.0.0</PackageValidationBaselineVersion>
+
 		<!-- Deterministic paths in the symbol package when building on a CI runner. -->
 		<ContinuousIntegrationBuild Condition="'$(GITHUB_ACTIONS)' == 'true'">true</ContinuousIntegrationBuild>
 
 		<!-- NuGet package metadata -->
 		<PackageId>Riddersholm.Resultify</PackageId>
-		<Version>0.0.0</Version>
+		<!--
+			Source of truth for local builds and for CI builds of main and pull requests; a release takes its
+			version from the tag instead. It must not drop below PackageValidationBaselineVersion: package
+			validation rejects an assembly version lower than the baseline's (CP0003).
+		-->
+		<Version>2.0.0</Version>
 		<Authors>Jesper Bruhn Riddersholm</Authors>
 		<Company>Jesper Bruhn Riddersholm</Company>
 		<Product>Resultify</Product>
